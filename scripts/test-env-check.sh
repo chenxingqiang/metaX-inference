@@ -65,7 +65,7 @@ fi
 
 # E05: GPU memory hint
 if command -v mx-smi &>/dev/null; then
-  check E05 "GPU info (mx-smi)" PASS "$(mx-smi 2>/dev/null | head -5 | tr '\n' ' ')"
+  check E05 "GPU info (mx-smi)" PASS "$(mx-smi 2>/dev/null | head -5 | tr '\n' ' ' || true)"
 elif [[ -d /dev/dri ]]; then
   check E05 "DRI devices present" WARN "mx-smi not found; check VRAM manually"
 else

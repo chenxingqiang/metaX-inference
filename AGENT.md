@@ -203,9 +203,34 @@ export VLLM_MODEL=./qwen3.6-27b-4bit
 | 推理慢 | 检查 `-ngl`、GPU 利用率 | 确保层在 GPU 上 |
 | vLLM 无法加载沐曦 | 日志与 `macart-vllm-metax` 版本 | 使用 `==0.11.0` 并与 MXMACA 版本匹配 |
 
-## 9. 测试结果记录模板
+## 9. 测试结果
 
-在沐曦实机上执行后，将结果填入下表（可追加到本文档或单独 `TEST_RESULTS.md`）：
+**实机测试记录见 [TEST_RESULTS.md](./TEST_RESULTS.md)**（MetaX C500 / 32GB / 2026-07-06）。
+
+### 实机验证摘要
+
+| 方案 | 状态 | 说明 |
+|------|------|------|
+| B（vLLM） | **PASS** | `QuantTrio/Qwen3.6-27B-AWQ` + vllm_metax 0.17.0，~9.5 tok/s |
+| A（GGUF） | 未测 | 需安装 Vulkan SDK 并编译 llama.cpp |
+
+### Qwen3.6 特别注意
+
+`Qwen3.6` 在 `config.json` 中声明 `model_type: qwen3_5`，**transformers 4.57.x 无法加载**。实机需：
+
+```bash
+pip install "git+https://github.com/huggingface/transformers.git"
+```
+
+### 32GB 显存（MetaX C500 sGPU）推荐
+
+- **模型**：`QuantTrio/Qwen3.6-27B-AWQ`（INT4，推理占用约 28GB）
+- **参数**：`--max-model-len 8192`，`--tensor-parallel-size 1`
+- **备选**：`Qwen/Qwen3.6-35B-A3B`（MoE，需单独实测）
+
+### 结果记录模板
+
+在沐曦实机上执行后，可将结果追加到 [TEST_RESULTS.md](./TEST_RESULTS.md)：
 
 ```markdown
 ## 测试执行记录
@@ -250,6 +275,8 @@ export VLLM_MODEL=./qwen3.6-27b-4bit
 | `scripts/test-scheme-a.sh` | 方案 A 自动化冒烟测试 |
 | `scripts/test-scheme-b.sh` | 方案 B 自动化冒烟测试 |
 | `scripts/quantize-qwen36.py` | Unsloth 4-bit 量化并导出 |
+| `scripts/remote_test_scheme_b.sh` | 实机方案 B 端到端测试（含模型下载） |
+| `scripts/remote_test_vllm_fix.sh` | 升级 transformers 后启动 vLLM 并验证 |
 
 ## 11. 总结
 
@@ -259,4 +286,4 @@ export VLLM_MODEL=./qwen3.6-27b-4bit
 
 ---
 
-*当前 CI / Cloud Agent 环境无沐曦 GPU，脚本与文档供实机验证；执行后请更新第 9 节测试结果。*
+*实机测试结果见 [TEST_RESULTS.md](./TEST_RESULTS.md)；远程冒烟脚本见 `scripts/remote_test_*.sh`。*
