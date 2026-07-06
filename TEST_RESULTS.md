@@ -18,7 +18,7 @@
 | 编号 | 结果 | 备注 |
 |------|------|------|
 | E01 | PASS | metax/maca 3.5.3 软件栈已安装 |
-| E02 | **SKIP** | 未安装 `vulkan-sdk` / `vulkaninfo`（方案 A 前置缺失） |
+| E02 | **PARTIAL** | 已装 `vulkan-tools`，但 `/usr/share/vulkan/icd.d/` 无沐曦 ICD，仅 Mesa/Intel |
 | E03 | PASS | Python 3.10.10 |
 | E04 | **SKIP** | 未安装 Unsloth（方案 B 使用预量化 AWQ，无需 Unsloth 在线量化） |
 | E05 | PASS | mx-smi 可见 MetaX C500，32GB sGPU 显存配额 |
@@ -27,7 +27,43 @@
 
 | 编号 | 结果 | 备注 |
 |------|------|------|
-| A01–A05 | **未测** | 服务器无 Vulkan SDK、无 llama.cpp；需额外安装后补测 |
+| A01 | **PARTIAL** | llama.cpp 编译成功（**CPU 回退**）；`-DGGML_VULKAN=ON` 因缺 `SPIRV-Headers` 失败 |
+| A02 | **PASS** | `llama-server` 启动，模型加载 ~84s |
+| A03 | **PASS** | `/completion` 返回中文续写正常 |
+| A04 | **FAIL** | 未启用 Vulkan/GPU；`-ngl` 被忽略，**GPU 利用率 0%** |
+| A05 | PASS | `-c 2048` 上下文可用 |
+
+### 模型与命令（实测）
+
+```bash
+# 下载 GGUF（注意文件名大小写）
+hf download unsloth/Qwen3.6-27B-MTP-GGUF Qwen3.6-27B-Q4_K_M.gguf \
+  --local-dir /data/scheme-a/models
+
+# llama-server（当前为 CPU 编译版）
+/data/scheme-a/llama.cpp/build/bin/llama-server \
+  -m /data/scheme-a/models/Qwen3.6-27B-Q4_K_M.gguf \
+  -ngl 0 -c 2048 -t 32 --host 127.0.0.1 --port 8080
+```
+
+### 性能（CPU 回退）
+
+| 指标 | 值 |
+|------|-----|
+| 模型 | `Qwen3.6-27B-Q4_K_M.gguf`（16GB） |
+| 加载时间 | ~84s |
+| 生成吞吐 | **~0.56 tokens/s**（CPU，32 线程） |
+| 显存 | GPU **未使用**（826 MiB 空闲） |
+
+### 方案 A 阻塞项（沐曦 GPU 加速）
+
+1. **无沐曦 Vulkan ICD**：`/opt/maca` 下未发现 `*vulkan*`，系统 icd 仅 Intel/LVP/Radeon
+2. **SPIRV-Headers 缺失**：Ubuntu apt 包不足以编译 `GGML_VULKAN`
+3. 需沐曦官方 Vulkan 驱动 + LunarG SDK 完整安装后，方可 `-ngl 99` 走 GPU
+
+### 推理样例响应
+
+Prompt: `你好，我是` → 返回 `小雅。...你好，小雅！很高兴认识你。`（32 tokens，HTTP 200）
 
 ## 方案 B：量化模型 + MacaRT-vLLM
 
@@ -87,6 +123,6 @@ curl http://127.0.0.1:8000/v1/completions \
 
 ## 结论
 
+- [x] **方案 A** GGUF + llama.cpp **功能验证 PASS**（CPU 回退；沐曦 Vulkan GPU 加速未打通）
 - [x] **方案 B** 在 MetaX C500（32GB）上可用于 Qwen3.6-27B-AWQ 生产推理
-- [ ] **方案 A** 待安装 Vulkan SDK + 编译 llama.cpp 后补测
-- **阻塞项**：Qwen3.6 需 transformers ≥5.x dev；方案 A 缺 Vulkan 环境
+- **阻塞项**：方案 A 沐曦 GPU 需 Vulkan ICD + SPIRV 编译链；方案 B 需 transformers ≥5.x dev

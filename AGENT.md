@@ -211,8 +211,8 @@ export VLLM_MODEL=./qwen3.6-27b-4bit
 
 | 方案 | 状态 | 说明 |
 |------|------|------|
+| A（GGUF） | **PASS（CPU）** | `Qwen3.6-27B-Q4_K_M.gguf` + llama-server；GPU Vulkan 未启用 |
 | B（vLLM） | **PASS** | `QuantTrio/Qwen3.6-27B-AWQ` + vllm_metax 0.17.0，~9.5 tok/s |
-| A（GGUF） | 未测 | 需安装 Vulkan SDK 并编译 llama.cpp |
 
 ### Qwen3.6 特别注意
 
@@ -276,6 +276,7 @@ pip install "git+https://github.com/huggingface/transformers.git"
 | `scripts/test-scheme-b.sh` | 方案 B 自动化冒烟测试 |
 | `scripts/quantize-qwen36.py` | Unsloth 4-bit 量化并导出 |
 | `scripts/remote_test_scheme_b.sh` | 实机方案 B 端到端测试（含模型下载） |
+| `scripts/remote_test_scheme_a.sh` | 实机方案 A 端到端测试（GGUF + llama-server） |
 | `scripts/remote_test_vllm_fix.sh` | 升级 transformers 后启动 vLLM 并验证 |
 
 ## 11. 总结
