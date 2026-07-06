@@ -278,12 +278,209 @@ pip install "git+https://github.com/huggingface/transformers.git"
 | `scripts/remote_test_scheme_b.sh` | 实机方案 B 端到端测试（含模型下载） |
 | `scripts/remote_test_scheme_a.sh` | 实机方案 A 端到端测试（GGUF + llama-server） |
 | `scripts/remote_test_vllm_fix.sh` | 升级 transformers 后启动 vLLM 并验证 |
+| `scripts/bench_qwen36.py` | Qwen3.6 端到端 tok/s 基准（Phase 1+） |
 
 ## 11. 总结
 
-- **快速验证**：优先 **方案 A**（Unsloth GGUF + llama.cpp / Vulkan）。
-- **生产部署**：采用 **方案 B**（Unsloth 量化 + MacaRT-vLLM）。
-- 核心依赖沐曦 MXMACA 的 Vulkan 与 PyTorch 兼容能力；按本文档与脚本在实机上执行即可完成测试闭环。
+- **快速验证**：方案 A（GGUF + llama.cpp；沐曦 Vulkan 未打通时用 CPU 回退）。
+- **生产部署**：**方案 B**（vLLM + vllm_metax）— 实机已 PASS，~9.5 tok/s。
+- **长期最优**：见第 12 节 — 在 vllm_metax + mcoplib 上构建 MACA 版「算子 + 引擎」双层加速，而非移植 Unsloth Triton/CUDA。
+
+---
+
+## 12. MACA 最佳推理工具设计（对标 Unsloth 双层加速）
+
+> **Design 阶段** — 目标：在沐曦 MACA 上为 Qwen3.6-27B 构建类似 Unsloth 的推理加速栈，但**不能**直接复用 Unsloth 的 Triton/CUDA 内核。
+
+### 12.1 为什么 Unsloth 不能直接搬过来？
+
+| Unsloth 组件 | 依赖 | MACA 现状 |
+|--------------|------|-----------|
+| FastInference / Triton 内核 | NVIDIA CUDA + Triton | **不可用**（MACA 非 CUDA ISA） |
+| RoPE / KV 融合算子 | 自定义 CUDA | 需用 **mcoplib / mcflashattn / MACA DSL** 重写 |
+| `for_inference()` patch | PyTorch + CUDA autograd | 可借鉴思路，底层算子必须换 MACA |
+| vLLM 导出 | 通用 vLLM | **已有** `vllm_metax 0.17.0` + `mcoplib`（实机 PASS） |
+
+实机结论：**Unsloth 的价值在「架构分层 + 热点算子融合」**；在 MACA 上应把「热点算子」映射到沐曦栈，把「吞吐引擎」交给 **vllm_metax**。
+
+### 12.2 目标架构（对标 Unsloth 双层模型）
+
+```mermaid
+flowchart TB
+  subgraph App["应用层"]
+    API["OpenAI API / Notebook"]
+  end
+
+  subgraph Engine["引擎层 — 吞吐 / 并发 / KV 管理"]
+    VLLM["vllm_metax\nPagedAttention · Continuous Batching"]
+    MTP["MTP / Speculative Decoding\n(可选)"]
+  end
+
+  subgraph Ops["算子层 — MACA Kernel"]
+    AWQ["MacaAWQ / GPTQ GEMM\n(mcoplib)"]
+    FA["Flash Attention GQA\n(mcflashattn)"]
+    ROPE["Fused RoPE + RMSNorm\n(待补 / mcoplib)"]
+    KV["Paged KV R/W\n(vLLM 已有)"]
+  end
+
+  subgraph HW["硬件"]
+    MACA["MetaX C500 + MACA 3.5.x"]
+  end
+
+  API --> VLLM
+  VLLM --> MTP
+  VLLM --> AWQ
+  VLLM --> FA
+  VLLM --> ROPE
+  VLLM --> KV
+  AWQ --> MACA
+  FA --> MACA
+  ROPE --> MACA
+  KV --> MACA
+```
+
+对应 Unsloth 映射关系：
+
+| Unsloth 能力 | MACA 等价实现 | 优先级 |
+|--------------|---------------|--------|
+| vLLM + PagedAttention | **vllm_metax**（已部署） | P0 ✅ |
+| AWQ / 4bit 量化推理 | **MacaAWQMarlinConfig**（vllm_metax 已注册） | P0 ✅ |
+| Flash Attention | **mcflashattn** + vLLM attention backend | P0 |
+| Fused RoPE | **mcoplib 自定义 Op** 或 vllm_metax fused pass | P1 |
+| KV Cache 优化 | vLLM v1 KV manager（已用） | P0 ✅ |
+| FastInference 单条低延迟 | `FastLanguageModel.for_inference` **不适用**；用 vLLM `--max-num-seqs 1` 或轻量 MACA eager | P2 |
+| MTP 1.5–2× 加速 | vllm_metax 已有 `Step3p5MTP` /registry 模式，可接 Qwen3.6 draft | P1 |
+
+### 12.3 推荐工具形态：`metaX-inference` 仓库演进路线
+
+#### Phase 0 — 生产基线（**当前，已完成**）
+
+- 引擎：`vllm serve` + `vllm_metax`
+- 模型：`QuantTrio/Qwen3.6-27B-AWQ`（32GB 显存）
+- 依赖：`transformers` 5.x dev（`qwen3_5` 架构）
+- 指标：~**9.5 tok/s** 单请求（C500 sGPU 32GB）
+
+#### Phase 1 — 配置级榨干（1–2 周，无自定义 kernel）
+
+```bash
+vllm serve /data/models/Qwen3.6-27B-AWQ \
+  --tensor-parallel-size 1 \
+  --max-model-len 8192 \
+  --max-num-batched-tokens 8192 \
+  --max-num-seqs 64 \
+  --enable-chunked-prefill \
+  --trust-remote-code
+```
+
+待测项：
+
+- `AWQ` vs `GPTQ` vs Unsloth 导出 4bit 在 vllm_metax 上的 tokens/s
+- `--gpu-memory-utilization 0.92` 与 batch 并发曲线
+- 启用 **chunked prefill** 对长 prompt 的延迟影响
+
+#### Phase 2 — 算子级加速（核心：类似 Unsloth kernel 层）
+
+建议在仓库新增：
+
+```text
+metaX-inference/
+├── metax_kernels/           # MACA 算子插件（Python + mcoplib / C++）
+│   ├── qwen36/
+│   │   ├── fused_rope_rms.py    # RoPE+RMSNorm 融合（对标 Unsloth）
+│   │   ├── awq_gemm.py          # 薄封装 MacaAWQ，便于 benchmark
+│   │   └── gqa_attention.py     # GQA + mcflashattn 路径
+│   └── bench/
+│       └── op_bench.py          # 单算子 vs PyTorch eager 对比
+├── engine/
+│   └── vllm_metax_plugin/   # vLLM custom op 注册（若需 patch vllm_metax）
+├── scripts/
+│   └── bench_qwen36.py      # 端到端 tokens/s、TTFT、并发
+└── configs/
+    └── qwen36-27b-awq.yaml    # 最佳实践参数
+```
+
+**Qwen3.6-27B 热点算子优先级（按 profiling 预期）：**
+
+1. **Quantized GEMM（AWQ W4A16）** — 占 decode 大部分时间 → 用 vllm_metax 已有 MacaAWQ，先 benchmark 是否瓶颈
+2. **GQA Flash Attention** — 27B 多 head GQA → `mcflashattn` / `flash-linear-attention`（服务器已装 metax 版）
+3. **Fused RoPE + RMSNorm** — Unsloth 第二大优化点 → **mcoplib 新 Op**（MACA DSL 或 C++ extension）
+4. **SiLU / SwiGLU MLP** — 可融合进 mcoplib MoE/GEMM pass（Qwen3.6 若为 dense MLP）
+
+开发流程（TDD 对齐）：
+
+1. **Design**：用 `mcpti` / vLLM log 定位 decode 阶段 top kernel
+2. **Op 单测**：`op_bench.py` 对比 MACA fused vs 原生 PyTorch
+3. **集成**：通过 vLLM `CustomOp` 或 vllm_metax plugin 注入
+4. **E2E**：`bench_qwen36.py` 目标相对 Phase 0 提升 **30–50%** tokens/s
+
+#### Phase 3 — 引擎级加速（对标 Unsloth + vLLM 整合）
+
+| 技术 | 说明 | MACA 路径 |
+|------|------|-----------|
+| **MTP / Speculative** | draft 小模型预测 + 大模型验证 | Unsloth 提供 `Qwen3.6-27B-MTP-GGUF`；vLLM 侧参考 `Step3p5MTP` 注册 |
+| **Continuous batching** | 多请求合并 decode | vllm_metax 默认 |
+| **Prefix caching** | 相同 system prompt 复用 KV | vLLM `--enable-prefix-caching` |
+| **Multi-LoRA** | 适配器热切换 | vllm_metax 若支持则启用 |
+
+MTP 在 MACA 上比 llama.cpp Vulkan 更现实：**走 vllm_metax，不走 GGUF**。
+
+#### Phase 4 — 「MACA FastInference」轻量模式（可选）
+
+对标 Unsloth `for_inference()`，适合 Notebook 单条：
+
+```python
+# 目标 API（待实现，非 Unsloth）
+from metax_inference import MacaFastModel
+
+model, tok = MacaFastModel.from_pretrained(
+    "QuantTrio/Qwen3.6-27B-AWQ",
+    max_seq_length=8192,
+)
+model.enable_maca_inference()  # 关闭 grad、启用 fused ops
+out = model.generate("你好", max_new_tokens=128)
+```
+
+实现要点：
+
+- 不依赖 Unsloth；加载 HF/vLLM 权重
+- `enable_maca_inference()` 替换 attention/MLP 为 `metax_kernels` 注册算子
+- 单 batch 延迟优化；**吞吐仍用 vllm serve**
+
+### 12.4 与 Unsloth Workflow 的分工
+
+```text
+训练/量化（可选，NVIDIA 或 CPU 环境）     沐曦 MACA 推理（本仓库）
+────────────────────────────────────    ────────────────────────────
+Unsloth 微调 / 4bit 量化               →  导出 AWQ/GPTQ safetensors
+或 HuggingFace 预量化 AWQ              →  vllm_metax serve
+Unsloth GGUF（方案 A）                 →  仅快速验证；生产不推荐（Vulkan 未通）
+```
+
+**32GB MetaX C500 最佳组合（当前证据）：**
+
+| 组件 | 选型 |
+|------|------|
+| 模型 | `Qwen3.6-27B-AWQ` INT4 |
+| 引擎 | `vllm_metax 0.17.0` |
+| 算子 | mcoplib + mcflashattn（默认） + 自研 fused RoPE（Phase 2） |
+| 加速 | MTP speculative（Phase 3，目标 1.5×+） |
+
+### 12.5 验收指标（建议写入 TEST_RESULTS.md）
+
+| 阶段 | 指标 | 目标（C500 32GB） |
+|------|------|-------------------|
+| Phase 0 | 单请求 decode tok/s | 9.5（已达成） |
+| Phase 1 | 并发 8 req 总吞吐 | > 40 tok/s |
+| Phase 2 | 单请求 decode tok/s | > 14 tok/s（+50%） |
+| Phase 3 | + MTP | > 20 tok/s 等效 |
+| 质量 | perplexity / 人工抽检 | 与 AWQ baseline 偏差 < 1% |
+
+### 12.6 下一步行动（建议）
+
+1. 在实机跑 **Phase 1 参数扫描**（batch、chunked prefill、gpu-memory-utilization）
+2. 用 **mcpti / PyTorch profiler** 抓 Qwen3.6-27B decode 热点，确认是否 AWQ GEMM 或 Attention 为主
+3. 在 `metax_kernels/qwen36/` 实现 **fused RoPE+RMSNorm** 第一个 mcoplib Op（Unsloth 对标物）
+4. 向沐曦索取 **Vulkan ICD** 仅用于方案 A 验证；**生产算力路径以 vllm_metax 为准**
 
 ---
 
