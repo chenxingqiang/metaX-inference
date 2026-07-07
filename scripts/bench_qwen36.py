@@ -196,6 +196,7 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=600.0)
     parser.add_argument("--stream", action="store_true", help="Use SSE streaming for TTFT")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--output", help="Write JSON results to file")
     args = parser.parse_args()
 
     total = args.requests or args.concurrency
@@ -228,7 +229,12 @@ def main() -> int:
     summary["total_wall_s"] = round(wall_total, 3)
 
     if args.json:
-        print(json.dumps({"summary": summary, "results": [asdict(r) for r in results]}, indent=2))
+        payload = {"summary": summary, "results": [asdict(r) for r in results]}
+        text = json.dumps(payload, indent=2)
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(text)
+        print(text)
     else:
         print(f"concurrency: {concurrency}, requests: {total}")
         print(f"success: {summary.get('success', 0)}/{summary.get('requests', total)}")

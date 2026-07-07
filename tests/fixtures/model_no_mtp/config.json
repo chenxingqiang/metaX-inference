@@ -1,0 +1,5 @@
+{
+  "model_type": "qwen3_5",
+  "architectures": ["Qwen3_5ForConditionalGeneration"],
+  "num_hidden_layers": 2
+}

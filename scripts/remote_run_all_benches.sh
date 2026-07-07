@@ -56,3 +56,8 @@ echo "All benchmarks complete. Summary: $SUMMARY"
 echo "Detailed logs:"
 echo "  $LOG_ROOT/phase1/PHASE1_CONCURRENT_BENCH.md"
 echo "  $LOG_ROOT/phase3/PHASE3_MTP_BENCH.md"
+echo "  $LOG_ROOT/PARSED_RESULTS.md"
+
+if [[ -x "$REPO_DIR/scripts/export_bench_bundle.sh" ]]; then
+  bash "$REPO_DIR/scripts/export_bench_bundle.sh"
+fi

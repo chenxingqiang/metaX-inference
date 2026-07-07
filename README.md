@@ -10,8 +10,12 @@
 ## 快速开始
 
 ```bash
-# 环境检查（沐曦实机）
-./scripts/test-env-check.sh
+# 本地验证（部署前）
+./scripts/validate_repo.sh
+
+# 生产 vLLM 启动
+./scripts/serve_qwen36_metax.sh
+METAX_KERNELS=1 ENABLE_MTP=1 ./scripts/serve_qwen36_metax.sh
 
 # 方案 B：vLLM 冒烟
 export VLLM_MODEL=/data/models/Qwen3.6-27B-AWQ

@@ -1,0 +1,9 @@
+{
+  "metadata": {},
+  "weight_map": {
+    "model.layers.0.self_attn.q_proj.weight": "model-00001.safetensors",
+    "mtp.layers.0.self_attn.q_proj.weight": "model-00002.safetensors",
+    "mtp.layers.0.self_attn.k_proj.weight": "model-00002.safetensors",
+    "mtp.head.weight": "model-00002.safetensors"
+  }
+}
