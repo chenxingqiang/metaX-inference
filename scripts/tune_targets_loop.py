@@ -120,6 +120,7 @@ def _run_bench(
         "--temperature", str(bench.temperature),
         "--concurrency", str(concurrency),
         "--requests", str(concurrency),
+        "--warmup-requests", "1",
         "--api", bench.api,
         "--stream",
         "--json",

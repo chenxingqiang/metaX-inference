@@ -121,6 +121,7 @@ def _run_e2e_bench(
         "--max-tokens", "128",
         "--temperature", str(temperature),
         "--concurrency", "1",
+        "--warmup-requests", "1",
         "--stream", "--json", "--output", str(out),
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)

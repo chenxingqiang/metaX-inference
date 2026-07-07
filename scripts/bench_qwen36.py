@@ -219,12 +219,27 @@ def main() -> int:
     parser.add_argument("--requests", type=int, default=None, help="Total requests (default=concurrency)")
     parser.add_argument("--timeout", type=float, default=600.0)
     parser.add_argument("--stream", action="store_true", help="Use SSE streaming for TTFT")
+    parser.add_argument("--warmup-requests", type=int, default=0, help="Discard N warmup requests before timing")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--output", help="Write JSON results to file")
     args = parser.parse_args()
 
     total = args.requests or args.concurrency
     concurrency = min(args.concurrency, total)
+
+    if args.warmup_requests > 0:
+        for i in range(args.warmup_requests):
+            run_single_request(
+                args.url,
+                args.prompt,
+                args.max_tokens,
+                args.temperature,
+                -1,
+                args.timeout,
+                args.stream,
+                api=args.api,
+                no_think=args.no_think,
+            )
 
     results: List[RequestResult] = []
     t_wall0 = time.perf_counter()

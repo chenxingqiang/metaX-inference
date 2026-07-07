@@ -17,6 +17,7 @@ RESULT="$LOG_DIR/PHASE1_CONCURRENT_BENCH.md"
 PROMPT="${PROMPT:-请用中文写一段约120字的自我介绍，不要换行。}"
 MAX_TOKENS="${MAX_TOKENS:-128}"
 TEMPERATURE="${TEMPERATURE:-0.0}"
+WARMUP_REQUESTS="${WARMUP_REQUESTS:-1}"
 BENCH_API="${BENCH_API:-completions}"
 BENCH_NO_THINK="${BENCH_NO_THINK:-0}"
 
@@ -70,6 +71,7 @@ run_concurrent() {
     --prompt "$PROMPT" \
     --max-tokens "$MAX_TOKENS" \
     --temperature "$TEMPERATURE" \
+    --warmup-requests "$WARMUP_REQUESTS" \
     --api "$BENCH_API" \
     "${extra[@]}" \
     --concurrency "$concurrency" \
