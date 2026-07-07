@@ -126,3 +126,25 @@ curl http://127.0.0.1:8000/v1/completions \
 - [x] **方案 A** GGUF + llama.cpp **功能验证 PASS**（CPU 回退；沐曦 Vulkan GPU 加速未打通）
 - [x] **方案 B** 在 MetaX C500（32GB）上可用于 Qwen3.6-27B-AWQ 生产推理
 - **阻塞项**：方案 A 沐曦 GPU 需 Vulkan ICD + SPIRV 编译链；方案 B 需 transformers ≥5.x dev
+
+## Phase 2 算子 Baseline（MetaX C500，2026-07-07）
+
+`PYTHONPATH=. python -m metax_kernels.bench.op_bench --seq-len 256 --json`
+
+| Kernel | avg ms | 说明 |
+|--------|--------|------|
+| qwen36.fused_rope_rms (eager) | **0.94** | RoPE+RMSNorm+QKV baseline，待 mcoplib 融合 |
+| qwen36.gqa_attention:sdpa | **0.12** | PyTorch SDPA，当前 GQA 最快 |
+| qwen36.gqa_attention:fused | 0.16 | flash_attn 路径（MACA 版） |
+| qwen36.gqa_attention:eager | 0.25 | 纯 matmul softmax |
+
+原始 JSON：`metax_kernels/bench/results_op_bench_c500.json`
+
+## Phase 1 vLLM 参数扫描（MetaX C500，2026-07-07）
+
+| 配置 | tokens/s | elapsed (128 tok) |
+|------|----------|-------------------|
+| Baseline（默认） | **7.44** | 17.20s |
+| Phase 1 tuned（chunked prefill + prefix cache + gpu-mem 0.92） | 7.35 | 17.42s |
+
+单请求场景下 Phase 1 参数无明显提升；并发 batch 测试待补。Qwen3.6 默认输出含 thinking 块，影响 tok/s 对比。

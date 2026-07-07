@@ -1,0 +1,13 @@
+{
+  "device": "cuda",
+  "gpu": "MetaX C500",
+  "date": "2026-07-07",
+  "seq_len": 256,
+  "benchmarks": [
+    {"kernel": "qwen36.fused_rope_rms", "avg_ms": 0.94, "shape": "B=1,S=256,H=5120"},
+    {"kernel": "qwen36.gqa_attention:eager", "avg_ms": 0.25, "shape": "B=1,H=40,S=256,D=128"},
+    {"kernel": "qwen36.gqa_attention:sdpa", "avg_ms": 0.12, "shape": "B=1,H=40,S=256,D=128"},
+    {"kernel": "qwen36.gqa_attention:fused", "avg_ms": 0.16, "shape": "B=1,H=40,S=256,D=128"}
+  ],
+  "notes": "SDPA fastest for GQA at S=256; fused_rope_rms is eager baseline pending mcoplib kernel"
+}

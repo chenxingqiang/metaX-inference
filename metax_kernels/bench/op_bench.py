@@ -54,17 +54,24 @@ def bench_fused_rope_rms(
     iters: int,
 ) -> Dict[str, float]:
     head_dim = hidden // num_heads
+    kv_dim = num_kv_heads * head_dim
     x = torch.randn(batch, seq_len, hidden, device=device, dtype=dtype)
     qw = torch.randn(hidden, hidden, device=device, dtype=dtype)
-    kw = torch.randn(num_kv_heads * head_dim, hidden, device=device, dtype=dtype)
-    vw = torch.randn(hidden, hidden, device=device, dtype=dtype)
+    kw = torch.randn(kv_dim, hidden, device=device, dtype=dtype)
+    vw = torch.randn(kv_dim, hidden, device=device, dtype=dtype)
     qnw = torch.ones(head_dim, device=device, dtype=dtype)
     knw = torch.ones(head_dim, device=device, dtype=dtype)
 
     def run():
         fused_rope_rmsnorm(
-            x, qw, kw, vw, qnw, knw,
-            num_heads=num_heads, num_kv_heads=num_kv_heads,
+            x,
+            q_proj_weight=qw,
+            k_proj_weight=kw,
+            v_proj_weight=vw,
+            q_norm_weight=qnw,
+            k_norm_weight=knw,
+            num_heads=num_heads,
+            num_kv_heads=num_kv_heads,
         )
 
     stats = _bench_fn(run, warmup, iters)

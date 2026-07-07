@@ -54,7 +54,9 @@ def _build_rope_cache(
     t = torch.arange(seq_len, device=device, dtype=dtype)
     freqs = torch.outer(t, inv_freq)
     emb = torch.cat((freqs, freqs), dim=-1)
-    return emb.cos()[None, None, :, :], emb.sin()[None, None, :, :]
+    cos = emb.cos()[None, :, None, :]
+    sin = emb.sin()[None, :, None, :]
+    return cos, sin
 
 
 @register_kernel("qwen36.fused_rope_rms", impl="eager")
@@ -72,6 +74,7 @@ def fused_rope_rmsnorm_eager(
     """Qwen3-style: RMSNorm on Q/K projections, then RoPE."""
     bsz, seq_len, hidden = hidden_states.shape
     head_dim = hidden // num_heads
+    kv_dim = num_kv_heads * head_dim
 
     q = F.linear(hidden_states, q_proj_weight)
     k = F.linear(hidden_states, k_proj_weight)
