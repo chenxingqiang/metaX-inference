@@ -89,5 +89,37 @@ class TestGqaAttention(unittest.TestCase):
         self.assertEqual(out_eager.shape, (b, h, s, d))
 
 
+@unittest.skipUnless(HAS_TORCH, "torch not installed")
+class TestFusedMlp(unittest.TestCase):
+    def test_output_shape(self) -> None:
+        from metax_kernels.qwen36.fused_mlp import fused_mlp
+
+        device = torch.device("cpu")
+        dtype = torch.float32
+        b, s, h, i = 1, 8, 512, 1024
+        x = torch.randn(b, s, h, device=device, dtype=dtype)
+        gw = torch.randn(i, h, device=device, dtype=dtype)
+        uw = torch.randn(i, h, device=device, dtype=dtype)
+        dw = torch.randn(h, i, device=device, dtype=dtype)
+        out = fused_mlp(x, gw, uw, dw, impl="eager")
+        self.assertEqual(out.shape, (b, s, h))
+
+
+class TestKernelRegistry(unittest.TestCase):
+    def test_override(self) -> None:
+        from metax_kernels.registry import KernelRegistry
+
+        @KernelRegistry.register("test.op", impl="eager")
+        def eager_fn():
+            return "eager"
+
+        def fused_fn():
+            return "fused"
+
+        KernelRegistry.override("test.op", "fused", fused_fn)
+        self.assertEqual(KernelRegistry.get("test.op", impl="fused")(), "fused")
+        self.assertEqual(KernelRegistry.get("test.op", impl="eager")(), "eager")
+
+
 if __name__ == "__main__":
     unittest.main()

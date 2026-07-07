@@ -34,6 +34,9 @@ run_section() {
 
 cd "$REPO_DIR"
 
+run_section "Pre-check — MTP head in checkpoint" \
+  python scripts/check_mtp_head.py "${MODEL:-/data/models/Qwen3.6-27B-AWQ}" --json
+
 run_section "Phase 2 — Operator micro-benchmark" \
   bash scripts/run_op_bench.sh --seq-len 256 --json
 
@@ -45,6 +48,9 @@ run_section "Phase 1 — Concurrent batch (1/4/8 req)" \
 
 run_section "Phase 3 — MTP speculative" \
   bash scripts/run_phase3_mtp_bench.sh
+
+run_section "Parse results" \
+  python scripts/parse_bench_results.py "$LOG_ROOT/ALL_BENCH_SUMMARY.md" -o "$LOG_ROOT/PARSED_RESULTS.md"
 
 echo "All benchmarks complete. Summary: $SUMMARY"
 echo "Detailed logs:"

@@ -38,15 +38,18 @@ PYTHONPATH=. python scripts/profile_decode.py --seq-len 256 --json
 # 单元测试
 python -m unittest tests.test_metax_kernels -v
 
-# 同步到实机
-./scripts/remote_sync_repo.sh
+# vLLM with metax_kernels auto-load
+METAX_KERNELS=1 METAX_KERNEL_IMPL=fused vllm serve /data/models/Qwen3.6-27B-AWQ ...
 ```
 
 ## 包结构
 
 ```text
-metax_kernels/qwen36/   # fused RoPE+RMSNorm, GQA attention
-engine/vllm_metax_plugin/
-configs/qwen36-27b-awq.yaml
+metax_kernels/
+  qwen36/               # fused RoPE, GQA, AWQ GEMM, SwiGLU MLP
+  mcoplib_bridge.py     # runtime mcoplib wiring
+engine/vllm_metax_plugin/  # vLLM CustomOp + METAX_KERNELS=1 loader
+configs/
 scripts/bench_qwen36.py
+tests/
 ```

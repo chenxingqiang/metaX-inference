@@ -13,6 +13,7 @@ import torch
 from metax_kernels.qwen36.fused_rope_rms import fused_rope_rmsnorm
 from metax_kernels.qwen36.gqa_attention import gqa_attention
 from metax_kernels.qwen36.awq_gemm import awq_gemm
+from metax_kernels.qwen36.fused_mlp import fused_mlp
 from metax_kernels.registry import KernelRegistry
 
 
@@ -130,11 +131,37 @@ def bench_awq_gemm(
     return stats
 
 
+def bench_fused_mlp(
+    batch: int,
+    seq_len: int,
+    hidden: int,
+    intermediate: int,
+    dtype: torch.dtype,
+    device: torch.device,
+    impl: str,
+    warmup: int,
+    iters: int,
+) -> Dict[str, float]:
+    x = torch.randn(batch, seq_len, hidden, device=device, dtype=dtype)
+    gw = torch.randn(intermediate, hidden, device=device, dtype=dtype)
+    uw = torch.randn(intermediate, hidden, device=device, dtype=dtype)
+    dw = torch.randn(hidden, intermediate, device=device, dtype=dtype)
+
+    def run():
+        fused_mlp(x, gw, uw, dw, impl=impl)
+
+    stats = _bench_fn(run, warmup, iters)
+    stats["kernel"] = f"qwen36.fused_mlp:{impl}"
+    stats["shape"] = f"B={batch},S={seq_len},H={hidden},I={intermediate}"
+    return stats
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="MACA Qwen3.6 operator micro-benchmark")
     parser.add_argument("--batch", type=int, default=1)
     parser.add_argument("--seq-len", type=int, default=512)
     parser.add_argument("--hidden", type=int, default=5120)
+    parser.add_argument("--intermediate", type=int, default=17408)
     parser.add_argument("--num-heads", type=int, default=40)
     parser.add_argument("--num-kv-heads", type=int, default=8)
     parser.add_argument("--dtype", default="bfloat16", choices=["float16", "bfloat16", "float32"])
@@ -192,6 +219,17 @@ def main() -> int:
             )
         except Exception as exc:
             results["benchmarks"].append({"kernel": f"awq_gemm:{impl}", "error": str(exc)})
+
+    for impl in ("eager", "fused"):
+        try:
+            results["benchmarks"].append(
+                bench_fused_mlp(
+                    args.batch, args.seq_len, args.hidden, args.intermediate,
+                    dtype, device, impl, args.warmup, args.iters,
+                )
+            )
+        except Exception as exc:
+            results["benchmarks"].append({"kernel": f"fused_mlp:{impl}", "error": str(exc)})
 
     if args.json:
         print(json.dumps(results, indent=2))

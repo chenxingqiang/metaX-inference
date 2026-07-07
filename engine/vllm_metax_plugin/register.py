@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 QWEN36_KERNEL_MAP: Dict[str, tuple[str, str]] = {
     "fused_rope_rmsnorm": ("qwen36.fused_rope_rms", "fused"),
     "gqa_attention": ("qwen36.gqa_attention", "fused"),
+    "fused_mlp": ("qwen36.fused_mlp", "fused"),
 }
 
 _registered: bool = False
@@ -92,30 +93,28 @@ def register_qwen36_kernels(
 
 
 def patch_qwen36_attention_layer(model: object, impl: str = "fused") -> int:
-    """Monkey-patch Qwen3.5 attention modules to use metax_kernels (notebook / debug).
+    """Attach metax_kernels hooks to Qwen3.x attention modules (notebook / debug).
 
-    Returns number of layers patched. Does not modify vLLM server weights.
+    Patches modules that expose q_proj/k_proj/v_proj. The hook delegates to the
+    original forward but exposes fused kernel callables on the module for
+    manual benchmarking or future full replacement.
+
+    Returns number of layers patched.
     """
     from metax_kernels.qwen36.fused_rope_rms import fused_rope_rmsnorm
     from metax_kernels.qwen36.gqa_attention import gqa_attention
 
     patched = 0
     for module in model.modules():  # type: ignore[attr-defined]
-        cls_name = module.__class__.__name__
-        if "Attention" not in cls_name:
+        if not all(hasattr(module, a) for a in ("q_proj", "k_proj", "v_proj")):
             continue
         if hasattr(module, "_metax_kernels_patched"):
             continue
 
-        orig_forward = module.forward
-
-        def _wrapped_forward(self, *args, **kwargs):  # type: ignore[no-untyped-def]
-            return orig_forward(*args, **kwargs)
-
-        module.forward = _wrapped_forward.__get__(module, module.__class__)
-        module._metax_kernels_patched = True
-        module._metax_fused_rope_rms = fused_rope_rmsnorm
-        module._metax_gqa_attention = gqa_attention
+        module._metax_fused_rope_rms = fused_rope_rmsnorm  # type: ignore[attr-defined]
+        module._metax_gqa_attention = gqa_attention  # type: ignore[attr-defined]
+        module._metax_kernel_impl = impl  # type: ignore[attr-defined]
+        module._metax_kernels_patched = True  # type: ignore[attr-defined]
         patched += 1
 
     if patched:

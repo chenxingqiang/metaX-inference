@@ -34,6 +34,11 @@ class KernelRegistry:
         cls._default_impl = impl
 
     @classmethod
+    def override(cls, name: str, impl: str, fn: Callable) -> None:
+        """Replace a registered kernel at runtime (e.g. mcoplib bootstrap)."""
+        cls._kernels[f"{name}:{impl}"] = fn
+
+    @classmethod
     def list_kernels(cls) -> list[str]:
         return sorted(cls._kernels.keys())
 

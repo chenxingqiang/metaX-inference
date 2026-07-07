@@ -121,14 +121,15 @@ def fused_rope_rmsnorm_eager(
 
 @register_kernel("qwen36.fused_rope_rms", impl="fused")
 def fused_rope_rmsnorm_fused(*args, **kwargs):
-    """Placeholder for mcoplib fused kernel. Falls back to eager until registered."""
-    try:
-        import mcoplib  # noqa: F401 — future MACA fused op
+    """mcoplib fused kernel when available, else eager."""
+    from metax_kernels.mcoplib_bridge import bootstrap_mcoplib
 
-        # TODO: mcoplib.qwen36_fused_rope_rms(...)
-        pass
-    except ImportError:
-        pass
+    bootstrap_mcoplib(impl="fused")
+    from metax_kernels.registry import KernelRegistry
+
+    fn = KernelRegistry.get("qwen36.fused_rope_rms", impl="fused")
+    if fn is not fused_rope_rmsnorm_fused:
+        return fn(*args, **kwargs)
     return fused_rope_rmsnorm_eager(*args, **kwargs)
 
 
