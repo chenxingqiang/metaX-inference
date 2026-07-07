@@ -28,25 +28,27 @@ echo "GPU: $(mx-smi 2>/dev/null | grep -m1 MetaX || echo unknown)"
 
 mkdir -p "$REPO_DIR" "$LOG_ROOT"
 
-  if [[ ! -f "$REPO_DIR/scripts/remote_run_all_benches.sh" ]]; then
-    echo "Syncing repo to $REPO_DIR ..."
-    if curl -fsSL "$GITHUB_RAW/$BRANCH/scripts/sync_from_github.sh" -o /tmp/sync_from_github.sh; then
-      bash /tmp/sync_from_github.sh
+if [[ ! -f "$REPO_DIR/scripts/remote_run_all_benches.sh" ]]; then
+  echo "Syncing repo to $REPO_DIR ..."
+  if curl -fsSL "$GITHUB_RAW/$BRANCH/scripts/sync_from_github.sh" -o /tmp/sync_from_github.sh; then
+    bash /tmp/sync_from_github.sh
+  else
+    echo "Fallback: GitHub archive..."
+    TMPDIR="/tmp/metaX-inference-dl"
+    rm -rf "$TMPDIR"
+    mkdir -p "$TMPDIR" "$REPO_DIR"
+    curl -fsSL "https://github.com/chenxingqiang/metaX-inference/archive/refs/heads/${BRANCH}.tar.gz" \
+      | tar -xz -C "$TMPDIR" --strip-components=1
+    if command -v rsync &>/dev/null; then
+      rsync -a "$TMPDIR/" "$REPO_DIR/"
     else
-      echo "Fallback: GitHub archive..."
-      TMPDIR="/tmp/metaX-inference-dl"
-      rm -rf "$TMPDIR"
-      mkdir -p "$TMPDIR" "$REPO_DIR"
-      curl -fsSL "https://github.com/chenxingqiang/metaX-inference/archive/refs/heads/${BRANCH}.tar.gz" \
-        | tar -xz -C "$TMPDIR" --strip-components=1
-      if command -v rsync &>/dev/null; then
-        rsync -a "$TMPDIR/" "$REPO_DIR/"
-      else
-        find "$REPO_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
-        cp -a "$TMPDIR/." "$REPO_DIR/"
-      fi
+      find "$REPO_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+      cp -a "$TMPDIR/." "$REPO_DIR/"
     fi
   fi
+  # shellcheck source=/dev/null
+  source "${REPO_DIR}/scripts/metax_env.sh"
+fi
 
 cd "$REPO_DIR"
 
