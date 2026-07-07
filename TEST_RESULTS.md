@@ -6,7 +6,7 @@
 |------|-----|
 | 日期 | 2026-07-06 |
 | 服务器 | 140.207.205.81:32222 |
-| GPU | MetaX C500（sGPU 配额 **32GB** VRAM，算力 50%） |
+| GPU | MetaX C500（sGPU 配额 **32GB** VRAM，算力 **50%** — 云平台预分配，容器内不可改） |
 | MACA | 3.5.3.20 |
 | 系统 | Ubuntu 20.04 / Linux 5.15 |
 | Python | 3.10.10 (conda base) |
@@ -322,6 +322,32 @@ ENABLE_MTP=1 ./scripts/serve_qwen36_metax.sh     # 自动选用 graft 模型
 **结论：** 换 BF16 MTP checkpoint（graft）后 MTP c=8 仍 **~40–47 tok/s**，未达 80 tok/s。瓶颈不在 MTP 权重 dtype，而在 MetaX/vLLM speculative decode 路径本身。生产推荐继续 **无 MTP** c=8（~81 tok/s）。
 
 日志：`/data/metax-test-logs/mtp-bf16/MTP_BF16_BENCH.md`
+
+### sGPU 50% 算力限制（2026-07-07）
+
+**现状（容器内 `mx-smi`）：**
+
+```
+sGPU-Id 2 | Compute 50% | Vram 32000 MiB | Minor 016
+/sys 只读 (Docker guest) → mx-smi sgpu --disable / --set 失败
+```
+
+**容器内无法解除** — 需在 **云平台/宿主机** 调整实例 GPU 配额：
+
+| 方式 | 操作 |
+|------|------|
+| **云平台控制台** | 将实例 GPU 配额改为 **vcore=100%、vmemory=64G**（或整卡分配） |
+| **宿主机** | `bash scripts/metax_sgpu_full_gpu.sh`（`MODE=disable` 或 `MODE=set`） |
+| **K8s/HAMi** | Pod limits: `metax-tech.com/vcore: 100`, `metax-tech.com/vmemory: 64` |
+
+诊断（只读）：
+
+```bash
+CHECK_ONLY=1 bash scripts/metax_sgpu_full_gpu.sh
+mx-smi sgpu --show-remain   # available compute quota: 0% → 已满配给本实例
+```
+
+**解除后预期（估算，需复测）：** 单流 ~**60+ tok/s**，c=8 聚合 ~**150+ tok/s**（相对当前 32 / 81 约 2×）。
 
 实机跑完后自动验收：
 ```bash
