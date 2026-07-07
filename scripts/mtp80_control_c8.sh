@@ -19,7 +19,7 @@ start_vllm() {
     --gpu-memory-utilization 0.97 --max-num-batched-tokens 16384 --max-num-seqs 128 \
     --enable-chunked-prefill --enable-prefix-caching --trust-remote-code \
     "${extra[@]}" > /tmp/vllm-ctrl.log 2>&1 &
-  for i in $(seq 1 90); do curl -sf http://127.0.0.1:8000/v1/models >/dev/null && break; sleep 5; done
+  for i in $(seq 1 180); do curl -sf http://127.0.0.1:8000/v1/models >/dev/null && break; sleep 5; done
 }
 
 bench() {

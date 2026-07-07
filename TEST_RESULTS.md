@@ -272,6 +272,24 @@ bash scripts/phase3_warmup_retest.sh   # Phase 3 with warmup fix
 
 结果：`/data/metax-test-logs/tune/phase23/PHASE23_LOOP_RESULTS.md`
 
+### MTP 80 tok/s 调参循环（2026-07-07）
+
+```bash
+bash scripts/tune_mtp_80_loop.sh          # MTP grid c=8 sweep
+bash scripts/mtp80_control_c8.sh          # no-MTP vs MTP 对照
+```
+
+| 模式 | 配置 | c=8 tok/s | 目标 80 | 状态 |
+|------|------|-----------|---------|------|
+| **无 MTP**（baseline） | aggressive 0.97, long prompt, t=0 | **81.35** | 80 | **PASS** |
+| MTP-2 | high-mem, short prompt | **48.25** | 80 | FAIL |
+| MTP-2 | base, short prompt | 46.60 | 80 | FAIL |
+| MTP-8 | high-mem | 18.89 | 80 | FAIL |
+
+**结论：** AWQ 模型上 MTP speculative 增加 draft 开销但 acceptance 极低（`modules_to_not_convert` 含 `mtp`），**MTP 模式无法达到 80 tok/s**。要达到 80 tok/s 并发，使用 **无 MTP** 的 Phase 1 配置（`temperature=0` + long prompt + c=8）。BF16 MTP checkpoint 方可重新评估。
+
+日志：`/data/metax-test-logs/tune/mtp80/MTP80_LOOP_RESULTS.md`
+
 实机跑完后自动验收：
 ```bash
 python scripts/bench_acceptance.py /data/metax-test-logs
