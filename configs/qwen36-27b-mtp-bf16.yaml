@@ -1,0 +1,35 @@
+# Qwen3.6-27B with BF16 MTP head graft (fits MetaX C500 32GB)
+# Source: hampsonw/Qwen3.6-27B-AWQ-BF16-INT4-mtp-bf16
+# Main weights: AWQ INT4 (~26GB); mtp.* tensors: BF16 (15 tensors, ~810MB)
+
+model:
+  id: hampsonw/Qwen3.6-27B-AWQ-BF16-INT4-mtp-bf16
+  local_dir: /data/models/Qwen3.6-27B-MTP-BF16
+  fallback_awq: /data/models/Qwen3.6-27B-AWQ
+
+vllm:
+  tensor_parallel_size: 1
+  max_model_len: 8192
+  dtype: auto
+  gpu_memory_utilization: 0.92
+  max_num_batched_tokens: 8192
+  max_num_seqs: 128
+  enable_chunked_prefill: true
+  enable_prefix_caching: true
+  trust_remote_code: true
+  # Required for MTP on MACA (Triton autotune vs cudagraph)
+  compilation_config:
+    cudagraph_mode: none
+
+speculative:
+  method: mtp
+  num_speculative_tokens: 2
+  reasoning_parser: qwen3
+
+bench:
+  temperature: 0.0
+  warmup_requests: 1
+  max_tokens: 128
+  prompt_short: "你好，请用一句话介绍你自己。"
+  prompt_long: "请用中文写一段约120字的自我介绍，不要换行。"
+  mtp_target_tok_s: 80.0
