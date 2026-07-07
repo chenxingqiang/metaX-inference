@@ -2,7 +2,7 @@
 # =============================================================================
 # MetaX 实机一键脚本 — SSH 登录后直接粘贴运行（或 curl | bash）
 #
-#   curl -fsSL "https://raw.githubusercontent.com/chenxingqiang/metaX-inference/cursor/unsloth-qwen36-metax-test-5971/scripts/metax_paste_and_run.sh" | bash
+#   curl -fsSL "https://raw.githubusercontent.com/chenxingqiang/metaX-inference/main/scripts/metax_paste_and_run.sh" | bash
 #
 # 前置：conda base + vLLM + 模型 /data/models/Qwen3.6-27B-AWQ
 # =============================================================================
@@ -10,7 +10,7 @@ set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-/data/metaX-inference}"
 LOG_ROOT="${LOG_ROOT:-/data/metax-test-logs}"
-BRANCH="${BRANCH:-cursor/unsloth-qwen36-metax-test-5971}"
+BRANCH="${BRANCH:-main}"
 GITHUB_RAW="${GITHUB_RAW:-https://raw.githubusercontent.com/chenxingqiang/metaX-inference}"
 
 source /opt/conda/etc/profile.d/conda.sh 2>/dev/null || true
