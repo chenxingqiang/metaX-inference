@@ -17,6 +17,7 @@ RESULT="$LOG_DIR/PHASE3_MTP_BENCH.md"
 PROMPT="${PROMPT:-请用中文写一段约120字的自我介绍，不要换行。}"
 MAX_TOKENS="${MAX_TOKENS:-128}"
 TEMPERATURE="${TEMPERATURE:-0.0}"
+WARMUP_REQUESTS="${WARMUP_REQUESTS:-1}"
 MTP_TOKENS="${MTP_TOKENS:-2}"
 DISABLE_CUDAGRAPH="${DISABLE_CUDAGRAPH:-1}"
 COMP_CONFIG_NONE='{"cudagraph_mode":"none"}'
@@ -76,6 +77,7 @@ run_bench() {
     --prompt "$PROMPT" \
     --max-tokens "$MAX_TOKENS" \
     --temperature "$TEMPERATURE" \
+    --warmup-requests "$WARMUP_REQUESTS" \
     --concurrency 1 \
     --stream \
     --json 2>&1 | tee -a "$RESULT"

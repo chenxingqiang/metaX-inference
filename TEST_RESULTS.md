@@ -202,8 +202,10 @@ bash scripts/tune_targets_loop.sh
 
 **关键发现：** `temperature=0` 在 completions API 下跳过 Qwen3.6 thinking 预填充（TTFT 13s → 0.08s），单请求 **31.85 tok/s**，远超 9.5 目标。
 
+**注意：** vLLM 冷启动后首次 `t=0` 请求仍可能走 thinking（~7 tok/s）；需 **1 次 warmup 请求**（`--warmup-requests 1`）后测量才准确。
+
 ```bash
-python scripts/bench_qwen36.py --temperature 0 --max-tokens 128 --stream --json
+python scripts/bench_qwen36.py --temperature 0 --max-tokens 128 --warmup-requests 1 --stream --json
 bash scripts/phase0_sweep.sh   # 实机 sweep
 ```
 
@@ -251,8 +253,24 @@ bash /data/metaX-inference/scripts/remote_run_all_benches.sh
 |------|------|------|------|------|
 | Phase 0 | 单请求 tok/s | ≥ 9.5 | **31.85**（t=0） | **PASS** |
 | Phase 1 | 并发 8 req | ≥ 40 | **81.02**（tune loop） | **PASS** |
-| Phase 2 op | fused_rope_rms | ≤ 0.5 ms | **0.94 ms** eager | FAIL |
-| Phase 3 | + MTP | ≥ 20 | 待实机 | 待测 |
+| Phase 2 op | fused_rope_rms | ≤ 0.5 ms | **0.525 ms** fused @ S=256 | **接近 FAIL** (Δ 5%) |
+| Phase 3 | + MTP | ≥ 20 | **23.65**（MTP-2 + warmup） | **PASS** |
+
+### Phase 2/3 调参循环（2026-07-07）
+
+```bash
+bash scripts/tune_phase23_loop.sh      # op bench + speculative sweep
+bash scripts/phase3_warmup_retest.sh   # Phase 3 with warmup fix
+```
+
+| 阶段 | 最佳结果 | 目标 | 状态 |
+|------|----------|------|------|
+| Phase 2 fused_rope @ S=256 | **0.525 ms** (fused) | ≤ 0.5 ms | 差 5%，需 mcoplib |
+| Phase 3 baseline (warmup 后) | **31.95 tok/s** | ≥ 20 | **PASS** |
+| Phase 3 MTP-2 (warmup 后) | **23.65 tok/s** | ≥ 20 | **PASS** |
+| Phase 3 ngram-8 (warmup 后) | 16.86 tok/s | ≥ 20 | FAIL |
+
+结果：`/data/metax-test-logs/tune/phase23/PHASE23_LOOP_RESULTS.md`
 
 实机跑完后自动验收：
 ```bash
@@ -267,7 +285,7 @@ python scripts/bench_acceptance.py /data/metax-test-logs --markdown -o ACCEPTANC
 | phase0_single_tok_s | 31.85 | ≥ 9.5 | **PASS** |
 | phase0_single_tok_s_peak | 9.5 | ≥ 9.5 | **PASS** |
 | phase1_concurrent_8_tok_s | 81.02 | ≥ 40 | **PASS** |
-| phase3_mtp_tok_s | — | ≥ 20 | SKIP |
-| fused_rope_rms_ms | 0.94 | ≤ 0.5 | FAIL |
+| phase3_mtp_tok_s | 23.65 | ≥ 20 | **PASS** |
+| fused_rope_rms_ms | 0.525 | ≤ 0.5 | FAIL (Δ 5%) |
 
 数据来源：`configs/acceptance_baseline.json` + `metax_kernels/bench/results_op_bench_c500.json`
