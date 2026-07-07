@@ -17,6 +17,9 @@
 ./scripts/serve_qwen36_metax.sh
 METAX_KERNELS=1 ENABLE_MTP=1 ./scripts/serve_qwen36_metax.sh
 
+# 环境检查（沐曦实机）
+./scripts/test-env-check.sh
+
 # 方案 B：vLLM 冒烟
 export VLLM_MODEL=/data/models/Qwen3.6-27B-AWQ
 ./scripts/test-scheme-b.sh
@@ -64,3 +67,5 @@ configs/
 scripts/bench_qwen36.py
 tests/
 ```
+
+详细步骤、模型选型与故障排查见 [AGENT.md](./AGENT.md)。
