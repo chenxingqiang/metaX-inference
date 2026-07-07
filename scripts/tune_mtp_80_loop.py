@@ -123,16 +123,15 @@ def _bench(
 
 def _build_grid(max_loops: int) -> List[tuple[VllmCfg, int, int, str, int]]:
     vllm_cfgs = [
-        VllmCfg("base"),
         VllmCfg("high-mem", gpu_mem=0.95, max_seqs=128),
         VllmCfg("aggressive", gpu_mem=0.97, max_seqs=128, max_batched=16384),
+        VllmCfg("base"),
     ]
     grid: List[tuple[VllmCfg, int, int, str, int]] = []
-    # Prioritize high concurrency + long prompt (Phase 1 recipe under MTP)
     for v in vllm_cfgs:
-        for mtp in (2, 3, 4, 5, 8):
-            for conc in (8, 4, 1):
-                for prompt, max_tok in ((PROMPT_LONG, 128), (PROMPT_SHORT, 128)):
+        for mtp in (2, 4, 5, 8):
+            for conc in (8,):
+                for prompt, max_tok in ((PROMPT_LONG, 128), (PROMPT_SHORT, 128), (PROMPT_LONG, 64)):
                     grid.append((v, mtp, conc, prompt, max_tok))
     return grid[:max_loops]
 
