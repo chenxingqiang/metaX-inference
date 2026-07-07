@@ -124,7 +124,21 @@ curl http://127.0.0.1:8000/v1/completions \
 ## 仓库状态
 
 - **main** 已合并 PR #2（2026-07-07）：实机 A/B 验证 + metax_kernels + Phase 1/2/3 基准
-- 实机全套 benchmark 仍待 `metax_paste_and_run.sh` 执行
+- **Release [v0.1.0](https://github.com/chenxingqiang/metaX-inference/releases/tag/v0.1.0)**
+- 实机全套 benchmark 仍待人工 SSH 执行（Cloud Agent 无密码）
+
+### Owner 实机 Checklist
+
+- [ ] `sync_from_github.sh` 或 `metax_paste_and_run.sh`
+- [ ] `quick_smoke_metax.sh` PASS
+- [ ] `ACCEPTANCE.md` 中 Phase 1 并发 8 / Phase 3 MTP 非 SKIP
+- [ ] `export_bench_bundle.sh` + scp 下载 tarball
+- [ ] GitHub Issue 提交 benchmark 结果（可选）
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/chenxingqiang/metaX-inference/main/scripts/metax_paste_and_run.sh | bash
+# 快速模式: FAST=1 curl ... | bash
+```
 
 ## 结论
 

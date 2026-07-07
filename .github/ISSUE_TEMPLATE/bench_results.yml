@@ -1,0 +1,35 @@
+name: 实机 Benchmark 结果提交
+description: 提交 MetaX 实机 benchmark 结果（ACCEPTANCE / logs）
+title: "[Bench] "
+labels: ["benchmark"]
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      description: GPU / MACA / vLLM 版本
+      placeholder: MetaX C500 32GB, MACA 3.5.3.20, vllm_metax 0.17.0
+    validations:
+      required: true
+  - type: textarea
+    id: commands
+    attributes:
+      label: 执行的命令
+      value: |
+        curl -fsSL https://raw.githubusercontent.com/chenxingqiang/metaX-inference/main/scripts/metax_paste_and_run.sh | bash
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: ACCEPTANCE.md 或 bench_acceptance 输出
+      description: 粘贴 /data/metax-test-logs/ACCEPTANCE.md 内容
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: 附件路径（可选）
+      description: 如 /tmp/metax-bench-bundle.tar.gz 是否已下载
+      placeholder: scp 已下载到本地，或粘贴 tarball 内关键 JSON

@@ -14,7 +14,12 @@ curl -fsSL "https://github.com/chenxingqiang/metaX-inference/archive/refs/heads/
   | tar -xz -C "$TMP" --strip-components=1
 
 mkdir -p "$REPO_DIR"
-rsync -a --delete "$TMP/" "$REPO_DIR/"
+if command -v rsync &>/dev/null; then
+  rsync -a --delete "$TMP/" "$REPO_DIR/"
+else
+  find "$REPO_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+  cp -a "$TMP/." "$REPO_DIR/"
+fi
 rm -rf "$TMP"
 
 echo "Sync complete: $REPO_DIR ($(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo no-git))"

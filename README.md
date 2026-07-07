@@ -44,6 +44,10 @@ bash scripts/quick_smoke_metax.sh
 # SSH 登录沐曦后直接粘贴（curl | bash）
 curl -fsSL "https://raw.githubusercontent.com/chenxingqiang/metaX-inference/main/scripts/metax_paste_and_run.sh" | bash
 
+# 仅快速冒烟（~5 min）
+curl -fsSL "https://raw.githubusercontent.com/chenxingqiang/metaX-inference/main/scripts/quick_smoke_metax.sh" | bash
+# 或: FAST=1 curl ... metax_paste_and_run.sh | bash
+
 # Phase 2：算子 micro-benchmark（需 MACA PyTorch）
 PYTHONPATH=. ./scripts/run_op_bench.sh --seq-len 512 --json
 

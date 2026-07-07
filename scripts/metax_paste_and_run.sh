@@ -33,15 +33,26 @@ mkdir -p "$REPO_DIR" "$LOG_ROOT"
       echo "Fallback: GitHub archive..."
       TMPDIR="/tmp/metaX-inference-dl"
       rm -rf "$TMPDIR"
-      mkdir -p "$TMPDIR"
+      mkdir -p "$TMPDIR" "$REPO_DIR"
       curl -fsSL "https://github.com/chenxingqiang/metaX-inference/archive/refs/heads/${BRANCH}.tar.gz" \
         | tar -xz -C "$TMPDIR" --strip-components=1
-      mkdir -p "$REPO_DIR"
-      rsync -a "$TMPDIR/" "$REPO_DIR/"
+      if command -v rsync &>/dev/null; then
+        rsync -a "$TMPDIR/" "$REPO_DIR/"
+      else
+        find "$REPO_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+        cp -a "$TMPDIR/." "$REPO_DIR/"
+      fi
     fi
   fi
 
 cd "$REPO_DIR"
+
+if [[ "${FAST:-0}" == "1" ]]; then
+  echo "FAST=1 — running quick smoke only"
+  bash scripts/quick_smoke_metax.sh
+  exit 0
+fi
+
 bash scripts/validate_repo.sh
 bash scripts/remote_run_all_benches.sh
 
