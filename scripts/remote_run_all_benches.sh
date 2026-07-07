@@ -38,7 +38,7 @@ run_section "Pre-check — MTP head in checkpoint" \
   python scripts/check_mtp_head.py "${MODEL:-/data/models/Qwen3.6-27B-AWQ}" --json
 
 run_section "Phase 2 — Operator micro-benchmark" \
-  bash scripts/run_op_bench.sh --seq-len 256 --json
+  bash -c "bash scripts/run_op_bench.sh --seq-len 256 --json | tee '$LOG_ROOT/phase2_op_bench.json'"
 
 run_section "Phase 2 — Decode profiler" \
   env PYTHONPATH=. python scripts/profile_decode.py --seq-len 256 --json
@@ -51,6 +51,11 @@ run_section "Phase 3 — MTP speculative" \
 
 run_section "Parse results" \
   python scripts/parse_bench_results.py "$LOG_ROOT/ALL_BENCH_SUMMARY.md" -o "$LOG_ROOT/PARSED_RESULTS.md"
+
+run_section "Acceptance check" \
+  python scripts/bench_acceptance.py "$LOG_ROOT" --json -o "$LOG_ROOT/ACCEPTANCE.json"
+
+python scripts/bench_acceptance.py "$LOG_ROOT" | tee -a "$SUMMARY"
 
 echo "All benchmarks complete. Summary: $SUMMARY"
 echo "Detailed logs:"

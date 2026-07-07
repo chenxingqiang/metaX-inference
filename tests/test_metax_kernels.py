@@ -70,6 +70,25 @@ class TestFusedRopeRms(unittest.TestCase):
         self.assertEqual(len(mod._ROPE_CACHE), n_after_first)
         self.assertGreater(n_after_first, 0)
 
+    def test_opt_eager_matches_eager_shape(self) -> None:
+        from metax_kernels.qwen36.fused_rope_rms import fused_rope_rmsnorm
+
+        x, qw, kw, vw, qnw, knw = self._make_inputs()
+        kwargs = dict(
+            q_proj_weight=qw,
+            k_proj_weight=kw,
+            v_proj_weight=vw,
+            q_norm_weight=qnw,
+            k_norm_weight=knw,
+            num_heads=self.num_heads,
+            num_kv_heads=self.num_kv_heads,
+        )
+        q1, k1, v1 = fused_rope_rmsnorm(x, impl="eager", **kwargs)
+        q2, k2, v2 = fused_rope_rmsnorm(x, impl="opt_eager", **kwargs)
+        self.assertEqual(q1.shape, q2.shape)
+        self.assertEqual(k1.shape, k2.shape)
+        self.assertEqual(v1.shape, v2.shape)
+
 
 @unittest.skipUnless(HAS_TORCH, "torch not installed")
 class TestGqaAttention(unittest.TestCase):

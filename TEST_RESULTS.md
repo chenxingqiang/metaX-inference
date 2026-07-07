@@ -177,3 +177,18 @@ bash /data/metaX-inference/scripts/remote_run_all_benches.sh
 **Phase 3 目标**：等效 tok/s **> 20**（AGENT.md §12.5）。
 
 结果写入 `/data/metax-test-logs/phase3/PHASE3_MTP_BENCH.md`。
+
+## 验收目标（AGENT.md §12.5）
+
+| 阶段 | 指标 | 目标 | 当前 |
+|------|------|------|------|
+| Phase 0 | 单请求 tok/s | ≥ 9.5 | **7.44–9.5**（已测） |
+| Phase 1 | 并发 8 req | ≥ 40 | 待实机 |
+| Phase 2 | 单请求 tok/s | ≥ 14 | 待实机 |
+| Phase 2 op | fused_rope_rms | ≤ 0.5 ms | **0.94 ms** eager |
+| Phase 3 | + MTP | ≥ 20 | 待实机 |
+
+实机跑完后自动验收：
+```bash
+python scripts/bench_acceptance.py /data/metax-test-logs
+```

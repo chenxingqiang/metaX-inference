@@ -119,6 +119,50 @@ def fused_rope_rmsnorm_eager(
     return q, k, v
 
 
+@register_kernel("qwen36.fused_rope_rms", impl="opt_eager")
+def fused_rope_rmsnorm_opt_eager(
+    hidden_states: torch.Tensor,
+    q_proj_weight: torch.Tensor,
+    k_proj_weight: torch.Tensor,
+    v_proj_weight: torch.Tensor,
+    q_norm_weight: torch.Tensor,
+    k_norm_weight: torch.Tensor,
+    num_heads: int = DEFAULT_HEADS,
+    num_kv_heads: int = DEFAULT_KV_HEADS,
+    eps: float = 1e-6,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Single fused QKV matmul + RMSNorm + RoPE (interim before mcoplib)."""
+    bsz, seq_len, hidden = hidden_states.shape
+    head_dim = hidden // num_heads
+    kv_dim = num_kv_heads * head_dim
+
+    qkv_weight = torch.cat([q_proj_weight, k_proj_weight, v_proj_weight], dim=0)
+    qkv = F.linear(hidden_states, qkv_weight)
+    q = qkv[..., :hidden]
+    k = qkv[..., hidden : hidden + kv_dim]
+    v = qkv[..., hidden + kv_dim : hidden + kv_dim + kv_dim]
+
+    q = q.view(bsz, seq_len, num_heads, head_dim)
+    k = k.view(bsz, seq_len, num_kv_heads, head_dim)
+
+    q = _rms_norm(q, q_norm_weight, eps)
+    k = _rms_norm(k, k_norm_weight, eps)
+
+    cos, sin = _get_rope_cache(seq_len, head_dim, hidden_states.device, hidden_states.dtype)
+    q, k = _apply_rope(q, k, cos, sin)
+
+    q = q.transpose(1, 2)
+    k = k.transpose(1, 2)
+    v = v.view(bsz, seq_len, num_kv_heads, head_dim).transpose(1, 2)
+
+    if num_kv_heads != num_heads:
+        repeat = num_heads // num_kv_heads
+        k = k.repeat_interleave(repeat, dim=1)
+        v = v.repeat_interleave(repeat, dim=1)
+
+    return q, k, v
+
+
 @register_kernel("qwen36.fused_rope_rms", impl="fused")
 def fused_rope_rmsnorm_fused(*args, **kwargs):
     """mcoplib fused kernel when available, else eager."""

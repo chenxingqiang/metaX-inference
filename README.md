@@ -33,6 +33,9 @@ export VLLM_MODEL=/data/models/Qwen3.6-27B-AWQ
 # 实机一键全套基准
 ./scripts/remote_run_all_benches.sh
 
+# SSH 登录沐曦后直接粘贴（curl | bash）
+curl -fsSL "https://raw.githubusercontent.com/chenxingqiang/metaX-inference/cursor/unsloth-qwen36-metax-test-5971/scripts/metax_paste_and_run.sh" | bash
+
 # Phase 2：算子 micro-benchmark（需 MACA PyTorch）
 PYTHONPATH=. ./scripts/run_op_bench.sh --seq-len 512 --json
 

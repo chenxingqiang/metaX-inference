@@ -185,7 +185,7 @@ def main() -> int:
         "benchmarks": [],
     }
 
-    for impl in ("eager", "compiled", "fused"):
+    for impl in ("eager", "opt_eager", "compiled", "fused"):
         try:
             results["benchmarks"].append(
                 bench_fused_rope_rms(

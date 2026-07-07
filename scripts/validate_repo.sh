@@ -17,7 +17,8 @@ python3 -m py_compile \
   metax_kernels/qwen36/fused_mlp.py \
   metax_kernels/qwen36/fused_rope_rms.py \
   engine/vllm_metax_plugin/register.py \
-  engine/vllm_metax_plugin/loader.py
+  engine/vllm_metax_plugin/loader.py \
+  scripts/bench_acceptance.py
 
 echo "[2/5] Shell script syntax..."
 bash -n scripts/serve_qwen36_metax.sh

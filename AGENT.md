@@ -288,7 +288,8 @@ pip install "git+https://github.com/huggingface/transformers.git"
 | `scripts/check_mtp_head.py` | 检测 checkpoint 是否含 MTP head 权重 |
 | `scripts/serve_qwen36_metax.sh` | 生产 vLLM 启动（可选 METAX_KERNELS / MTP） |
 | `scripts/validate_repo.sh` | 本地验证（单测 + 语法）再部署实机 |
-| `scripts/export_bench_bundle.sh` | 打包实机日志 tarball 便于下载 |
+| `scripts/metax_paste_and_run.sh` | SSH 登录后 curl \| bash 一键实机全套 |
+| `scripts/bench_acceptance.py` | 对照 AGENT.md §12.5 验收目标 |
 | `scripts/remote_run_all_benches.sh` | 一键跑 Phase 1/2/3 全套基准 |
 | `metax_kernels/bench/op_bench.py` | fused RoPE / GQA attention 基准 |
 | `configs/qwen36-27b-awq.yaml` | C500 32GB 推荐 vLLM 配置 |
