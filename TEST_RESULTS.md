@@ -290,6 +290,39 @@ bash scripts/mtp80_control_c8.sh          # no-MTP vs MTP 对照
 
 日志：`/data/metax-test-logs/tune/mtp80/MTP80_LOOP_RESULTS.md`
 
+### BF16 MTP checkpoint 切换（2026-07-07）
+
+**Checkpoint：** `hampsonw/Qwen3.6-27B-AWQ-BF16-INT4-mtp-bf16`（AWQ INT4 主权重 + 15 个 BF16 `mtp.*` 张量）
+
+**MetaX 兼容性：** hampsonw 整包 **无法直接加载** — compressed-tensors WNA16 `uint4` 与 MetaX Exllama 内核（仅支持 `uint4b8`/`uint8b128`）不兼容：
+
+```
+ValueError: MacaExllamaLinearKernel ... Quant type (uint4) not supported
+```
+
+**Graft 方案（推荐）：** 下载 hampsonw 仅作 MTP 源，将 15 个 BF16 `mtp.*` 张量 graft 到 MetaX 兼容 AWQ 基座：
+
+```bash
+bash scripts/download_qwen36_mtp_bf16.sh          # 下载 + graft
+# 或已有源时：SKIP_DOWNLOAD=1 FORCE_GRAFT=1 bash scripts/download_qwen36_mtp_bf16.sh
+MODEL=/data/models/Qwen3.6-27B-AWQ-MTP-BF16 bash scripts/bench_mtp_bf16.sh
+ENABLE_MTP=1 ./scripts/serve_qwen36_metax.sh     # 自动选用 graft 模型
+```
+
+**验证：** graft 前后 `mtp.*` 张量与现有 `Qwen3.6-27B-AWQ` **数值完全一致**（hampsonw 与 QuantTrio AWQ 同源 graft）。
+
+| 模式 | c | tok/s | 目标 80 | 状态 |
+|------|---|-------|---------|------|
+| Graft baseline（无 MTP） | 1 | **31.98** | — | — |
+| Graft baseline（无 MTP） | 8 | **80.57** | 80 | **PASS** |
+| Graft + MTP-2 | 1 | 23.05 | ≥ 20 | PASS |
+| Graft + MTP-2 | 8 short | 47.29 | 80 | FAIL |
+| Graft + MTP-2 | 8 long | 39.83 | 80 | FAIL |
+
+**结论：** 换 BF16 MTP checkpoint（graft）后 MTP c=8 仍 **~40–47 tok/s**，未达 80 tok/s。瓶颈不在 MTP 权重 dtype，而在 MetaX/vLLM speculative decode 路径本身。生产推荐继续 **无 MTP** c=8（~81 tok/s）。
+
+日志：`/data/metax-test-logs/mtp-bf16/MTP_BF16_BENCH.md`
+
 实机跑完后自动验收：
 ```bash
 python scripts/bench_acceptance.py /data/metax-test-logs
