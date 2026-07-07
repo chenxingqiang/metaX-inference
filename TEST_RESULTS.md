@@ -187,8 +187,8 @@ Prompt: `你好，请用一句话介绍你自己。` / max_tokens: 128
 | 模式 | tok/s | 状态 |
 |------|-------|------|
 | Baseline（无 speculative） | **7.26** | PASS |
-| MTP (`num_speculative_tokens=2`) | — | **启动失败** |
-| N-gram fallback | — | **启动失败** |
+| MTP (`num_speculative_tokens=2`) | **0.86** | 启动成功但 **远低于 baseline**（AWQ 跳过 mtp 量化） |
+| N-gram fallback | **4.44** | 启动成功但 **慢于 baseline** |
 
 ### Root cause
 
@@ -201,17 +201,22 @@ torch.AcceleratorError: CUDA error: operation not permitted when stream is captu
 
 Speculative decode 路径与 MACA Triton autotune + cudagraph 不兼容。
 
-### Workaround（v0.1.2+）
+### Workaround（已验证 2026-07-07）
 
 ```bash
-# Phase 3 bench 默认 DISABLE_CUDAGRAPH=1
+# Phase 3 bench 默认 DISABLE_CUDAGRAPH=1（仅 speculative 路径加 flag）
 bash scripts/run_phase3_mtp_bench.sh
 
 # 生产 MTP serve
 DISABLE_CUDAGRAPH=1 ENABLE_MTP=1 MTP_TOKENS=2 scripts/serve_qwen36_metax.sh
 ```
 
-添加 `--compilation-config '{"cudagraph_mode":"none"}'` 禁用 cudagraph capture（仅 speculative 路径；baseline 不受影响）。重测待确认。
+使用 `--compilation-config '{"cudagraph_mode":"none"}'` 禁用 cudagraph capture（**不可**用 `--max-cudagraph-capture-size 0`，vLLM 0.17 要求 ≥ 1）。
+
+验证结果（workaround 后 2026-07-07）：
+- N-gram + `cudagraph_mode=none`：启动成功（~140s），吞吐 **4.44 tok/s**
+- MTP + `cudagraph_mode=none`：启动成功（~150s），吞吐 **0.86 tok/s**（AWQ `modules_to_not_convert` 含 `mtp`，draft 无效）
+- Phase 3 目标 ≥ 20 tok/s：**FAIL**（需 BF16 MTP checkpoint）
 
 结果文件：`/data/metax-test-logs/phase3/PHASE3_MTP_BENCH.md`
 
@@ -235,7 +240,7 @@ DISABLE_CUDAGRAPH=1 ENABLE_MTP=1 MTP_TOKENS=2 scripts/serve_qwen36_metax.sh
 | Phase 0 | 单请求 tok/s | ≥ 9.5 | 7.29（peak 9.5 历史） | **FAIL** |
 | Phase 1 | 并发 8 req | ≥ 40 | **21.09** | **FAIL** |
 | Phase 2 op | fused_rope_rms | ≤ 0.5 ms | **0.522 ms** eager | **接近 FAIL** |
-| Phase 3 | + MTP | ≥ 20 | 未测（启动失败） | **BLOCKED** |
+| Phase 3 | + MTP | ≥ 20 | 0.86（MTP）/ 4.44（ngram） | **FAIL** |
 
 实机跑完后自动验收：
 ```bash
@@ -250,7 +255,7 @@ python scripts/bench_acceptance.py /data/metax-test-logs --markdown -o ACCEPTANC
 | phase0_single_tok_s | 7.29 | ≥ 9.5 | FAIL |
 | phase0_single_tok_s_peak | 9.5 | ≥ 9.5 | **PASS** |
 | phase1_concurrent_8_tok_s | 21.09 | ≥ 40 | FAIL |
-| phase3_mtp_tok_s | — | ≥ 20 | BLOCKED |
+| phase3_mtp_tok_s | 0.86 (MTP) | ≥ 20 | FAIL |
 | fused_rope_rms_ms | 0.522 | ≤ 0.5 | FAIL (Δ 4%) |
 
 数据来源：`configs/acceptance_baseline.json` + `metax_kernels/bench/results_op_bench_c500.json` + `/data/metax-test-logs/`

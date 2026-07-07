@@ -5,7 +5,7 @@
     "phase0_single_tok_s_peak": 9.5,
     "phase1_concurrent_8_tok_s": 21.09,
     "phase2_single_tok_s": null,
-    "phase3_mtp_tok_s": null
+    "phase3_mtp_tok_s": 0.86
   },
   "op_bench_path": "metax_kernels/bench/results_op_bench_c500.json",
   "source": "TEST_RESULTS.md 2026-07-07 SSH full benchmark"
