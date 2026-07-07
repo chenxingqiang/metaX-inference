@@ -2,6 +2,8 @@
 
 在沐曦显卡上使用 Unsloth / vLLM 运行 Qwen3.6 推理的测试、内核与基准仓库。
 
+**Release:** [v0.1.0](https://github.com/chenxingqiang/metaX-inference/releases/tag/v0.1.0) — MetaX C500 实机 A/B 验证 + metax_kernels
+
 ## 文档
 
 - **[AGENT.md](./AGENT.md)** — 测试方案 + **§12 MACA 最佳推理架构设计**
@@ -32,6 +34,9 @@ export VLLM_MODEL=/data/models/Qwen3.6-27B-AWQ
 
 # Phase 3：MTP speculative（目标 >20 tok/s 等效）
 ./scripts/run_phase3_mtp_bench.sh
+
+# 实机快速冒烟（~5 min，非全套 benchmark）
+bash scripts/quick_smoke_metax.sh
 
 # 实机一键全套基准
 ./scripts/remote_run_all_benches.sh

@@ -14,6 +14,13 @@ def maybe_bootstrap() -> None:
         return
 
     impl = os.environ.get("METAX_KERNEL_IMPL", "fused")
+
+    if os.environ.get("METAX_MCOP_STUB", "").lower() in ("1", "true", "yes"):
+        from metax_kernels.dev.mcoplib_stub import install_stub
+
+        install_stub()
+        logger.info("METAX_MCOP_STUB=1: using opt_eager mcoplib stub")
+
     from engine.vllm_metax_plugin.register import register_qwen36_kernels
     from metax_kernels.mcoplib_bridge import bootstrap_mcoplib
 

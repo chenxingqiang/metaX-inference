@@ -288,6 +288,7 @@ pip install "git+https://github.com/huggingface/transformers.git"
 | `scripts/check_mtp_head.py` | 检测 checkpoint 是否含 MTP head 权重 |
 | `scripts/serve_qwen36_metax.sh` | 生产 vLLM 启动（可选 METAX_KERNELS / MTP） |
 | `scripts/validate_repo.sh` | 本地验证（单测 + 语法）再部署实机 |
+| `scripts/quick_smoke_metax.sh` | 实机快速冒烟（~5 min） |
 | `scripts/metax_paste_and_run.sh` | SSH 登录后 curl \| bash 一键实机全套 |
 | `scripts/sync_from_github.sh` | 实机从 GitHub 拉取 main（无需 scp） |
 | `scripts/update_acceptance_baseline.py` | 用 ACCEPTANCE.json 更新 baseline |
