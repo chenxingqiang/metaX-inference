@@ -1,26 +1,34 @@
 # metaX-inference
 
-在沐曦显卡上使用 Unsloth 运行 Qwen3.6 推理的测试与脚本仓库。
+在沐曦显卡上使用 Unsloth / vLLM 运行 Qwen3.6 推理的测试、内核与基准仓库。
 
 ## 文档
 
-- **[AGENT.md](./AGENT.md)** — 完整测试方案（方案 A：GGUF + llama.cpp/Vulkan；方案 B：Unsloth 量化 + MacaRT-vLLM）、验收标准与结果记录模板
+- **[AGENT.md](./AGENT.md)** — 测试方案 + **§12 MACA 最佳推理架构设计**
+- **[TEST_RESULTS.md](./TEST_RESULTS.md)** — 实机 A/B 测试结果
 
 ## 快速开始
 
 ```bash
-# 环境检查（需在沐曦实机 + MXMACA 环境）
+# 环境检查（沐曦实机）
 ./scripts/test-env-check.sh
 
-# 方案 A：设置模型与 llama-server 路径后冒烟测试
-export GGUF_MODEL=/path/to/qwen3.6-27b-mtp-q4_k_m.gguf
-export LLAMA_SERVER=/path/to/llama-server
-./scripts/test-scheme-a.sh
-
-# 方案 B：量化导出后启动 vLLM 冒烟测试
-python scripts/quantize-qwen36.py --output ./qwen3.6-27b-4bit
-export VLLM_MODEL=./qwen3.6-27b-4bit
+# 方案 B：vLLM 冒烟
+export VLLM_MODEL=/data/models/Qwen3.6-27B-AWQ
 ./scripts/test-scheme-b.sh
+
+# Phase 1：vLLM 参数扫描 + tok/s
+./scripts/run_phase1_bench.sh
+
+# Phase 2：算子 micro-benchmark（需 MACA PyTorch）
+PYTHONPATH=. ./scripts/run_op_bench.sh --seq-len 512 --json
 ```
 
-详细步骤、模型选型与故障排查见 [AGENT.md](./AGENT.md)。
+## 包结构
+
+```text
+metax_kernels/qwen36/   # fused RoPE+RMSNorm, GQA attention
+engine/vllm_metax_plugin/
+configs/qwen36-27b-awq.yaml
+scripts/bench_qwen36.py
+```
