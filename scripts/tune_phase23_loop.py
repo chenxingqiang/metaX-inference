@@ -130,15 +130,23 @@ def _run_e2e_bench(
     return float(data["summary"]["aggregate_tokens_per_s"])
 
 
-def run_phase2_loops(repo: Path, log_root: Path, max_loops: int) -> List[OpLoop]:
-    grid: List[tuple[int, str, str, int]] = []
-    for seq_len in (1, 64, 256):
-        for dtype in ("bfloat16", "float16"):
-            for impl in ("eager", "compiled", "fast", "fused", "opt_eager"):
-                for iters in (30, 50):
-                    grid.append((seq_len, dtype, impl, iters))
-    grid = grid[:max_loops]
+def _build_op_grid(max_loops: int) -> List[tuple[int, str, str, int]]:
+    """Prioritize S=256 (acceptance target) before decode S=1 sweeps."""
+    s256 = [
+        (256, "bfloat16", impl, iters)
+        for impl in ("fast", "eager", "compiled", "fused", "opt_eager")
+        for iters in (50, 30)
+    ]
+    s1 = [
+        (1, "bfloat16", impl, 30)
+        for impl in ("fast", "eager", "fused")
+    ]
+    grid = s256 + s1
+    return grid[:max_loops]
 
+
+def run_phase2_loops(repo: Path, log_root: Path, max_loops: int) -> List[OpLoop]:
+    grid = _build_op_grid(max_loops)
     results: List[OpLoop] = []
     best_ms: Optional[float] = None
 
@@ -165,14 +173,16 @@ def run_phase2_loops(repo: Path, log_root: Path, max_loops: int) -> List[OpLoop]
 def run_phase3_loops(repo: Path, log_root: Path, model: str, host: str, port: int, max_loops: int) -> List[Phase3Loop]:
     url = f"http://{host}:{port}"
     grid: List[tuple[str, str, float, str, bool]] = [
-        ("baseline", "", 0.0, PHASE1_PROMPT, False),
-        ("baseline-t07", "", 0.7, "你好，请用一句话介绍你自己。", False),
-        ("ngram-5", '{"method":"ngram","num_speculative_tokens":5,"prompt_lookup_max":4}', 0.0, PHASE1_PROMPT, True),
-        ("ngram-8", '{"method":"ngram","num_speculative_tokens":8,"prompt_lookup_max":8}', 0.0, PHASE1_PROMPT, True),
-        ("ngram-repeat", '{"method":"ngram","num_speculative_tokens":5,"prompt_lookup_max":4}', 0.0,
+        ("baseline-default-t0", "", 0.0, "你好，请用一句话介绍你自己。", False),
+        ("baseline-long-t0", "", 0.0, PHASE1_PROMPT, False),
+        ("ngram-8-default", '{"method":"ngram","num_speculative_tokens":8,"prompt_lookup_max":8}', 0.0,
+         "你好，请用一句话介绍你自己。", True),
+        ("ngram-8-long", '{"method":"ngram","num_speculative_tokens":8,"prompt_lookup_max":8}', 0.0, PHASE1_PROMPT, True),
+        ("ngram-repeat", '{"method":"ngram","num_speculative_tokens":8,"prompt_lookup_max":8}', 0.0,
          "重复测试：" + "你好 " * 20 + "请继续写下去。", True),
-        ("mtp-2", '{"method":"mtp","num_speculative_tokens":2}', 0.0, PHASE1_PROMPT, True),
-        ("mtp-4", '{"method":"mtp","num_speculative_tokens":4}', 0.0, PHASE1_PROMPT, True),
+        ("mtp-2-default", '{"method":"mtp","num_speculative_tokens":2}', 0.0,
+         "你好，请用一句话介绍你自己。", True),
+        ("mtp-2-long", '{"method":"mtp","num_speculative_tokens":2}', 0.0, PHASE1_PROMPT, True),
     ]
     grid = grid[:max_loops]
 
