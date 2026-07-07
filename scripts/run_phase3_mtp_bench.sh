@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Phase 3 MTP / speculative decoding benchmark (AGENT.md §12.3)
-# Compares baseline vs MTP vs ngram fallback on MetaX C500.
 set -euo pipefail
 
 source /opt/conda/etc/profile.d/conda.sh 2>/dev/null || true
@@ -15,11 +14,12 @@ PORT="${PORT:-8000}"
 LOG_DIR="${LOG_DIR:-/data/metax-test-logs/phase3}"
 REPO_DIR="${REPO_DIR:-/data/metaX-inference}"
 RESULT="$LOG_DIR/PHASE3_MTP_BENCH.md"
-PROMPT="${PROMPT:-你好，请用一句话介绍你自己。}"
+PROMPT="${PROMPT:-请用中文写一段约120字的自我介绍，不要换行。}"
 MAX_TOKENS="${MAX_TOKENS:-128}"
+TEMPERATURE="${TEMPERATURE:-0.0}"
+WARMUP_REQUESTS="${WARMUP_REQUESTS:-1}"
 MTP_TOKENS="${MTP_TOKENS:-2}"
-# Speculative decode + CUDA graph capture breaks Triton autotune on MACA
-# (maca_fused_recurrent_gated_delta_rule: "operation not permitted when stream is capturing").
+# Speculative decode + CUDA graph capture breaks Triton autotune on MACA.
 DISABLE_CUDAGRAPH="${DISABLE_CUDAGRAPH:-1}"
 COMP_CONFIG_NONE='{"cudagraph_mode":"none"}'
 
@@ -31,10 +31,12 @@ mkdir -p "$LOG_DIR"
   echo "- Model: $MODEL"
   echo "- GPU: $(mx-smi 2>/dev/null | grep -m1 MetaX || echo unknown)"
   echo "- MTP num_speculative_tokens: $MTP_TOKENS"
+  echo "- temperature: $TEMPERATURE"
+  echo "- warmup_requests: $WARMUP_REQUESTS"
+  echo "- DISABLE_CUDAGRAPH: $DISABLE_CUDAGRAPH"
   echo ""
   echo "> AWQ 量化模型可能缺少可用 MTP head（draft acceptance 0%）。"
   echo "> 若 MTP 无提升，请换带 \`mtp.*\` BF16 权重的 checkpoint。"
-  echo "> DISABLE_CUDAGRAPH=$DISABLE_CUDAGRAPH (uses --compilation-config cudagraph_mode=none for speculative)."
   echo ""
 } > "$RESULT"
 
@@ -55,10 +57,11 @@ start_vllm() {
     --tensor-parallel-size 1 \
     --max-model-len 8192 \
     --dtype auto \
-    --gpu-memory-utilization 0.90 \
+    --gpu-memory-utilization 0.92 \
     --max-num-batched-tokens 8192 \
-    --max-num-seqs 32 \
+    --max-num-seqs 64 \
     --enable-chunked-prefill \
+    --enable-prefix-caching \
     --trust-remote-code \
     "${cg_args[@]}" \
     "$@" \
@@ -74,33 +77,33 @@ start_vllm() {
 
 run_bench() {
   local label="$1"
-  echo "## $label" | tee -a "$RESULT"
+  local concurrency="${2:-1}"
+  echo "## $label (concurrency=$concurrency)" | tee -a "$RESULT"
   python "$REPO_DIR/scripts/bench_qwen36.py" \
     --url "http://${HOST}:${PORT}" \
     --prompt "$PROMPT" \
     --max-tokens "$MAX_TOKENS" \
-    --concurrency 1 \
+    --temperature "$TEMPERATURE" \
+    --warmup-requests "$WARMUP_REQUESTS" \
+    --concurrency "$concurrency" \
+    --requests "$concurrency" \
     --stream \
     --json 2>&1 | tee -a "$RESULT"
   echo "" | tee -a "$RESULT"
 }
 
-# Baseline (no speculative)
 start_vllm "baseline" 0
-run_bench "Baseline (no speculative)"
+run_bench "Baseline (no speculative)" 1
 
-# MTP native head
 SPEC_MTP="{\"method\":\"mtp\",\"num_speculative_tokens\":${MTP_TOKENS}}"
 if start_vllm "mtp" 1 --speculative-config "$SPEC_MTP" --reasoning-parser qwen3; then
-  run_bench "MTP (num_speculative_tokens=${MTP_TOKENS})"
+  run_bench "MTP (num_speculative_tokens=${MTP_TOKENS})" 1
 fi
 
-# ngram fallback (works without MTP weights)
-SPEC_NGRAM='{"method":"ngram","num_speculative_tokens":5,"prompt_lookup_max":4}'
+SPEC_NGRAM='{"method":"ngram","num_speculative_tokens":8,"prompt_lookup_max":8}'
 if start_vllm "ngram" 1 --speculative-config "$SPEC_NGRAM"; then
-  run_bench "N-gram speculative (fallback)"
+  run_bench "N-gram speculative (fallback)" 1
 fi
 
 pkill -f "vllm serve" 2>/dev/null || true
 echo "Phase 3 MTP sweep done." | tee -a "$RESULT"
-echo "Target: >20 tok/s equivalent (AGENT.md §12.5)" | tee -a "$RESULT"

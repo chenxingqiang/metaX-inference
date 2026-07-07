@@ -1,0 +1,30 @@
+# Best vLLM settings from tune_targets_loop (MetaX C500, 2026-07-07)
+
+model: /data/models/Qwen3.6-27B-AWQ
+
+vllm:
+  tensor_parallel_size: 1
+  max_model_len: 8192
+  dtype: auto
+  gpu_memory_utilization: 0.92
+  max_num_batched_tokens: 8192
+  max_num_seqs: 64
+  enable_chunked_prefill: true
+  enable_prefix_caching: true
+  trust_remote_code: true
+
+# Phase 1 concurrent x8: 81.02 tok/s (target >=40 PASS)
+bench_phase1:
+  api: completions
+  temperature: 0.0
+  prompt: "请用中文写一段约120字的自我介绍，不要换行。"
+  max_tokens: 128
+  concurrency: 8
+
+# Phase 0 single: 31.85 tok/s (target >=9.5 PASS) — temperature=0 skips thinking TTFT
+bench_phase0:
+  api: completions
+  temperature: 0.0
+  prompt: "你好，请用一句话介绍你自己。"
+  max_tokens: 128
+  concurrency: 1

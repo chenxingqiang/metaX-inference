@@ -48,6 +48,8 @@ def _stream_completion(
     url: str,
     payload: Dict[str, Any],
     timeout: float,
+    *,
+    api: str = "completions",
 ) -> tuple[int, float, Optional[float]]:
     """Return (completion_tokens, elapsed_s, ttft_s) using SSE streaming."""
     payload = {**payload, "stream": True}
@@ -82,7 +84,12 @@ def _stream_completion(
             choices = event.get("choices") or []
             if not choices:
                 continue
-            text = choices[0].get("text") or ""
+            choice = choices[0]
+            if api == "chat":
+                delta = choice.get("delta") or {}
+                text = delta.get("content") or ""
+            else:
+                text = choice.get("text") or ""
             if text:
                 completion_tokens += max(1, len(text.split()))
 
@@ -102,17 +109,32 @@ def run_single_request(
     request_id: int,
     timeout: float,
     stream: bool,
+    *,
+    api: str = "completions",
+    no_think: bool = False,
 ) -> RequestResult:
-    url = f"{base_url.rstrip('/')}/v1/completions"
-    payload = {
-        "prompt": prompt,
-        "max_tokens": max_tokens,
-        "temperature": temperature,
-    }
+    if api == "chat":
+        url = f"{base_url.rstrip('/')}/v1/chat/completions"
+        payload: Dict[str, Any] = {
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if no_think:
+            payload["chat_template_kwargs"] = {"enable_thinking": False}
+    else:
+        url = f"{base_url.rstrip('/')}/v1/completions"
+        payload = {
+            "prompt": prompt,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
 
     try:
         if stream:
-            completion_tokens, elapsed, ttft = _stream_completion(url, payload, timeout)
+            completion_tokens, elapsed, ttft = _stream_completion(
+                url, payload, timeout, api=api
+            )
         else:
             t0 = time.perf_counter()
             body = _post_json(url, payload, timeout)
@@ -191,16 +213,33 @@ def main() -> int:
     parser.add_argument("--prompt", default="你好，请用一句话介绍你自己。")
     parser.add_argument("--max-tokens", type=int, default=128)
     parser.add_argument("--temperature", type=float, default=0.7)
+    parser.add_argument("--api", choices=["completions", "chat"], default="completions")
+    parser.add_argument("--no-think", action="store_true", help="Chat API: disable Qwen thinking block")
     parser.add_argument("--concurrency", type=int, default=1, help="Parallel requests")
     parser.add_argument("--requests", type=int, default=None, help="Total requests (default=concurrency)")
     parser.add_argument("--timeout", type=float, default=600.0)
     parser.add_argument("--stream", action="store_true", help="Use SSE streaming for TTFT")
+    parser.add_argument("--warmup-requests", type=int, default=0, help="Discard N warmup requests before timing")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--output", help="Write JSON results to file")
     args = parser.parse_args()
 
     total = args.requests or args.concurrency
     concurrency = min(args.concurrency, total)
+
+    if args.warmup_requests > 0:
+        for i in range(args.warmup_requests):
+            run_single_request(
+                args.url,
+                args.prompt,
+                args.max_tokens,
+                args.temperature,
+                -1,
+                args.timeout,
+                args.stream,
+                api=args.api,
+                no_think=args.no_think,
+            )
 
     results: List[RequestResult] = []
     t_wall0 = time.perf_counter()
@@ -216,6 +255,8 @@ def main() -> int:
                 i,
                 args.timeout,
                 args.stream,
+                api=args.api,
+                no_think=args.no_think,
             )
             for i in range(total)
         ]

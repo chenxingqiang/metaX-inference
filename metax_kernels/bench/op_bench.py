@@ -185,7 +185,7 @@ def main() -> int:
         "benchmarks": [],
     }
 
-    for impl in ("eager", "opt_eager", "compiled", "fused"):
+    for impl in ("fast", "eager", "compiled", "fused", "opt_eager"):
         try:
             results["benchmarks"].append(
                 bench_fused_rope_rms(
@@ -195,7 +195,7 @@ def main() -> int:
                 )
             )
         except Exception as exc:
-            results["benchmarks"].append({"kernel": f"fused_rope_rms:{impl}", "error": str(exc)})
+            results["benchmarks"].append({"kernel": f"qwen36.fused_rope_rms:{impl}", "error": str(exc)})
 
     head_dim = args.hidden // args.num_heads
     for impl in ("eager", "sdpa", "fused"):
