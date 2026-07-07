@@ -18,12 +18,15 @@ python3 -m py_compile \
   metax_kernels/qwen36/fused_rope_rms.py \
   engine/vllm_metax_plugin/register.py \
   engine/vllm_metax_plugin/loader.py \
-  scripts/bench_acceptance.py
+  scripts/bench_acceptance.py \
+  scripts/update_acceptance_baseline.py
 
 echo "[2/5] Shell script syntax..."
 bash -n scripts/serve_qwen36_metax.sh
 bash -n scripts/remote_run_all_benches.sh
 bash -n scripts/run_phase3_mtp_bench.sh
+bash -n scripts/sync_from_github.sh
+bash -n scripts/metax_paste_and_run.sh
 
 echo "[3/5] Unit tests..."
 if python3 -c "import torch" 2>/dev/null; then

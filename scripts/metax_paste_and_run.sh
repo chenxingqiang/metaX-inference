@@ -25,21 +25,21 @@ echo "GPU: $(mx-smi 2>/dev/null | grep -m1 MetaX || echo unknown)"
 
 mkdir -p "$REPO_DIR" "$LOG_ROOT"
 
-if [[ ! -f "$REPO_DIR/scripts/remote_run_all_benches.sh" ]]; then
-  echo "Syncing repo to $REPO_DIR ..."
-  TMP="/tmp/metaX-inference-sync.tar.gz"
-  curl -fsSL "$GITHUB_RAW/$BRANCH/scripts/remote_sync_repo.sh" -o /tmp/sync.sh || true
-  if [[ -f /tmp/sync.sh ]]; then
-    bash /tmp/sync.sh 2>/dev/null || true
-  fi
   if [[ ! -f "$REPO_DIR/scripts/remote_run_all_benches.sh" ]]; then
-    echo "Fallback: curl tarball from GitHub archive..."
-    curl -fsSL "https://github.com/chenxingqiang/metaX-inference/archive/refs/heads/${BRANCH}.tar.gz" \
-      | tar -xz -C /tmp
-    cp -r "/tmp/metaX-inference-${BRANCH//\//-}"/* "$REPO_DIR/" 2>/dev/null || \
-      cp -r /tmp/metaX-inference-*/* "$REPO_DIR/" 2>/dev/null || true
+    echo "Syncing repo to $REPO_DIR ..."
+    if curl -fsSL "$GITHUB_RAW/$BRANCH/scripts/sync_from_github.sh" -o /tmp/sync_from_github.sh; then
+      bash /tmp/sync_from_github.sh
+    else
+      echo "Fallback: GitHub archive..."
+      TMPDIR="/tmp/metaX-inference-dl"
+      rm -rf "$TMPDIR"
+      mkdir -p "$TMPDIR"
+      curl -fsSL "https://github.com/chenxingqiang/metaX-inference/archive/refs/heads/${BRANCH}.tar.gz" \
+        | tar -xz -C "$TMPDIR" --strip-components=1
+      mkdir -p "$REPO_DIR"
+      rsync -a "$TMPDIR/" "$REPO_DIR/"
+    fi
   fi
-fi
 
 cd "$REPO_DIR"
 bash scripts/validate_repo.sh
@@ -48,6 +48,10 @@ bash scripts/remote_run_all_benches.sh
 python scripts/bench_acceptance.py "$LOG_ROOT" --json -o "$LOG_ROOT/ACCEPTANCE.json"
 python scripts/bench_acceptance.py "$LOG_ROOT" | tee -a "$LOG_ROOT/ACCEPTANCE.txt"
 python scripts/bench_acceptance.py "$LOG_ROOT" --markdown -o "$LOG_ROOT/ACCEPTANCE.md"
+
+if [[ -f "$LOG_ROOT/ACCEPTANCE.json" ]]; then
+  python scripts/update_acceptance_baseline.py "$LOG_ROOT/ACCEPTANCE.json" || true
+fi
 
 echo ""
 echo "=== 完成 ==="

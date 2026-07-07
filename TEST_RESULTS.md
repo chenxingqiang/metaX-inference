@@ -121,6 +121,11 @@ curl http://127.0.0.1:8000/v1/completions \
 | Qwen3.6-35B-A3B | MoE | 可尝试，需实测显存 |
 | Qwen3.6-27B BF16 | 全精度 | 不推荐，超出 32GB 配额 |
 
+## 仓库状态
+
+- **main** 已合并 PR #2（2026-07-07）：实机 A/B 验证 + metax_kernels + Phase 1/2/3 基准
+- 实机全套 benchmark 仍待 `metax_paste_and_run.sh` 执行
+
 ## 结论
 
 - [x] **方案 A** GGUF + llama.cpp **功能验证 PASS**（CPU 回退；沐曦 Vulkan GPU 加速未打通）
