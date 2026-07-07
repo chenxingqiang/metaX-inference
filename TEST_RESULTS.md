@@ -191,4 +191,17 @@ bash /data/metaX-inference/scripts/remote_run_all_benches.sh
 实机跑完后自动验收：
 ```bash
 python scripts/bench_acceptance.py /data/metax-test-logs
+python scripts/bench_acceptance.py /data/metax-test-logs --markdown -o ACCEPTANCE.md
 ```
+
+### 当前自动验收（baseline + 实机 op_bench，2026-07-07）
+
+| 指标 | 实测 | 目标 | 状态 |
+|------|------|------|------|
+| phase0_single_tok_s | 7.44 | ≥ 9.5 | FAIL |
+| phase0_single_tok_s_peak | 9.5 | ≥ 9.5 | **PASS** |
+| phase1_concurrent_8_tok_s | — | ≥ 40 | SKIP |
+| phase3_mtp_tok_s | — | ≥ 20 | SKIP |
+| fused_rope_rms_ms | 0.94 | ≤ 0.5 | FAIL |
+
+数据来源：`configs/acceptance_baseline.json` + `metax_kernels/bench/results_op_bench_c500.json`

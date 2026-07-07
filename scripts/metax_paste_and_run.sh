@@ -43,15 +43,11 @@ fi
 
 cd "$REPO_DIR"
 bash scripts/validate_repo.sh
-
-# Save op_bench JSON for acceptance script
-mkdir -p "$LOG_ROOT"
-PYTHONPATH=. bash scripts/run_op_bench.sh --seq-len 256 --json | tee "$LOG_ROOT/phase2_op_bench.json"
-
 bash scripts/remote_run_all_benches.sh
 
 python scripts/bench_acceptance.py "$LOG_ROOT" --json -o "$LOG_ROOT/ACCEPTANCE.json"
-python scripts/bench_acceptance.py "$LOG_ROOT"
+python scripts/bench_acceptance.py "$LOG_ROOT" | tee -a "$LOG_ROOT/ACCEPTANCE.txt"
+python scripts/bench_acceptance.py "$LOG_ROOT" --markdown -o "$LOG_ROOT/ACCEPTANCE.md"
 
 echo ""
 echo "=== 完成 ==="

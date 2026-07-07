@@ -42,8 +42,12 @@ PYTHONPATH=. ./scripts/run_op_bench.sh --seq-len 512 --json
 # Decode 热点 profiling
 PYTHONPATH=. python scripts/profile_decode.py --seq-len 256 --json
 
-# 单元测试
-python -m unittest tests.test_metax_kernels -v
+# 单元测试 + 验收预览（含 baseline）
+python -m unittest discover -s tests -v
+python scripts/bench_acceptance.py . --markdown
+
+# 可编辑安装
+pip install -e .
 
 # vLLM with metax_kernels auto-load
 METAX_KERNELS=1 METAX_KERNEL_IMPL=fused vllm serve /data/models/Qwen3.6-27B-AWQ ...

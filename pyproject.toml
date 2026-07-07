@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metax-inference"
+version = "0.1.0"
+description = "MetaX MACA inference kernels and benchmarks for Qwen3.6"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "metaX-inference contributors" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["metax_kernels*", "engine*"]
+
+[tool.setuptools.package-data]
+metax_kernels = ["bench/*.json", "native/*"]

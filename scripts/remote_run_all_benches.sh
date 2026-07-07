@@ -53,7 +53,7 @@ run_section "Parse results" \
   python scripts/parse_bench_results.py "$LOG_ROOT/ALL_BENCH_SUMMARY.md" -o "$LOG_ROOT/PARSED_RESULTS.md"
 
 run_section "Acceptance check" \
-  python scripts/bench_acceptance.py "$LOG_ROOT" --json -o "$LOG_ROOT/ACCEPTANCE.json"
+  bash -c "python scripts/bench_acceptance.py '$LOG_ROOT' --json -o '$LOG_ROOT/ACCEPTANCE.json' && python scripts/bench_acceptance.py '$LOG_ROOT' --markdown -o '$LOG_ROOT/ACCEPTANCE.md'"
 
 python scripts/bench_acceptance.py "$LOG_ROOT" | tee -a "$SUMMARY"
 

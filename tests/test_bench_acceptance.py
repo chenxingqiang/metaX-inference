@@ -35,9 +35,15 @@ class TestBenchAcceptance(unittest.TestCase):
             self.assertEqual(rope_check["status"], "PASS")
             self.assertEqual(rope_check["value"], 0.45)
 
-    def test_skip_when_no_data(self) -> None:
+    def test_baseline_phase0_peak_passes(self) -> None:
+        report = evaluate(Path("/nonexistent"), use_baseline=True)
+        peak = next(c for c in report["checks"] if c["name"] == "phase0_single_tok_s_peak")
+        self.assertEqual(peak["status"], "PASS")
+        self.assertEqual(peak["value"], 9.5)
+
+    def test_skip_when_no_baseline(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            report = evaluate(Path(tmp))
+            report = evaluate(Path(tmp), use_baseline=False)
             self.assertGreater(report["summary"]["skip"], 0)
 
 
