@@ -127,7 +127,28 @@ def _bench(
     return float(data["summary"]["aggregate_tokens_per_s"])
 
 
+def _build_refine_grid() -> List[Tuple[VllmCfg, BenchCfg, int]]:
+    """Second-pass grid around best c=16 configs (~151 tok/s)."""
+    bench_long = BenchCfg("t0-long", PROMPT_LONG, 128)
+    bench_64 = BenchCfg("t0-long-64", PROMPT_LONG, 64)
+    cfgs = [
+        (VllmCfg("aggressive-seq256", 0.97, 256, 16384), bench_long, 16),
+        (VllmCfg("aggressive-seq256", 0.97, 256, 16384), bench_long, 18),
+        (VllmCfg("aggressive", 0.97, 128, 16384), bench_long, 16),
+        (VllmCfg("aggressive", 0.97, 128, 16384), bench_long, 18),
+        (VllmCfg("aggressive-seq256", 0.97, 256, 16384), bench_64, 16),
+        (VllmCfg("aggressive-seq256", 0.97, 256, 16384), bench_64, 18),
+        (VllmCfg("high-mem-batch16k", 0.95, 128, 16384), bench_long, 16),
+        (VllmCfg("high-mem-batch16k", 0.95, 128, 16384), bench_long, 18),
+        (VllmCfg("aggressive-seq256", 0.97, 256, 16384), bench_long, 20),
+        (VllmCfg("tight-kv", 0.97, 256, 16384, 4096), bench_long, 16),
+    ]
+    return cfgs
+
+
 def _build_grid(max_loops: int) -> List[Tuple[VllmCfg, BenchCfg, int]]:
+    if os.environ.get("REFINE", "0") == "1":
+        return _build_refine_grid()[:max_loops]
     vllm_cfgs = [
         VllmCfg("base"),
         VllmCfg("high-mem", gpu_mem=0.95, max_seqs=128),
@@ -253,7 +274,7 @@ def main() -> int:
     p.add_argument("--model", default="/data/models/Qwen3.6-27B-AWQ")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8000)
-    p.add_argument("--log-root", default="/data/metax-test-logs/tune/c8160")
+    p.add_argument("--log-root", default=os.environ.get("LOG_ROOT", "/data/metax-test-logs/tune/c8160"))
     p.add_argument("--target", type=float, default=float(os.environ.get("C8_TARGET", DEFAULT_TARGET)))
     p.add_argument("--max-loops", type=int, default=int(os.environ.get("MAX_LOOPS", "20")))
     p.add_argument("--startup-timeout", type=int, default=900)

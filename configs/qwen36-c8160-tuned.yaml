@@ -1,0 +1,32 @@
+# Best aggregate throughput config from tune_c8_160_loop (MetaX C500 50% sGPU)
+# Target 160 tok/s: use concurrency 16-18, NOT c=8 alone (~81 tok/s cap)
+
+model: /data/models/Qwen3.6-27B-AWQ
+
+vllm:
+  tensor_parallel_size: 1
+  max_model_len: 8192
+  dtype: auto
+  gpu_memory_utilization: 0.95
+  max_num_batched_tokens: 16384
+  max_num_seqs: 128
+  enable_chunked_prefill: true
+  enable_prefix_caching: true
+  trust_remote_code: true
+  # Alternative peak: aggressive-seq256 (gpu_mem 0.97, max_num_seqs 256)
+
+bench:
+  api: completions
+  temperature: 0.0
+  warmup_requests: 1
+  prompt: "请用中文写一段约120字的自我介绍，不要换行。"
+  max_tokens: 128
+  # c=8  → ~81 tok/s aggregate (50% sGPU ceiling)
+  # c=16 → ~151 tok/s
+  # c=18 → ~156 tok/s (best measured: 155.89)
+  concurrency: 18
+  target_aggregate_tok_s: 160.0
+
+notes:
+  - "160 tok/s at literal c=8 requires ~2x compute (full sGPU 100%)"
+  - "MTP disabled — AWQ MTP caps ~40-47 tok/s at c=8"
