@@ -20,8 +20,14 @@ export VLLM_MODEL=/data/models/Qwen3.6-27B-AWQ
 # Phase 1：vLLM 参数扫描 + tok/s
 ./scripts/run_phase1_bench.sh
 
+# Phase 1：并发 batch（1/4/8 req，目标 >40 tok/s @ 8 req）
+./scripts/run_phase1_concurrent_bench.sh
+
 # Phase 2：算子 micro-benchmark（需 MACA PyTorch）
 PYTHONPATH=. ./scripts/run_op_bench.sh --seq-len 512 --json
+
+# 同步到实机
+./scripts/remote_sync_repo.sh
 ```
 
 ## 包结构

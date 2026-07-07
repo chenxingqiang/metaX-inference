@@ -7,7 +7,7 @@ Replace `fused` registration with mcoplib custom op when available.
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -114,10 +114,26 @@ def fused_rope_rmsnorm_fused(*args, **kwargs):
     return fused_rope_rmsnorm_eager(*args, **kwargs)
 
 
-def fused_rope_rmsnorm(hidden_states: torch.Tensor, **kwargs) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+_compiled_fn: Optional[Callable] = None
+
+
+@register_kernel("qwen36.fused_rope_rms", impl="compiled")
+def fused_rope_rmsnorm_compiled(*args, **kwargs):
+    """torch.compile wrapper — interim speedup before mcoplib Op lands."""
+    global _compiled_fn
+    if _compiled_fn is None:
+        _compiled_fn = torch.compile(fused_rope_rmsnorm_eager, mode="reduce-overhead")
+    return _compiled_fn(*args, **kwargs)
+
+
+def fused_rope_rmsnorm(
+    hidden_states: torch.Tensor,
+    impl: Optional[str] = None,
+    **kwargs,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     from metax_kernels.registry import KernelRegistry
 
-    fn = KernelRegistry.get("qwen36.fused_rope_rms")
+    fn = KernelRegistry.get("qwen36.fused_rope_rms", impl=impl)
     return fn(hidden_states, **kwargs)
 
 

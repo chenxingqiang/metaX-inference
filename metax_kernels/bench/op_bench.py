@@ -50,6 +50,7 @@ def bench_fused_rope_rms(
     num_kv_heads: int,
     dtype: torch.dtype,
     device: torch.device,
+    impl: str,
     warmup: int,
     iters: int,
 ) -> Dict[str, float]:
@@ -65,6 +66,7 @@ def bench_fused_rope_rms(
     def run():
         fused_rope_rmsnorm(
             x,
+            impl=impl,
             q_proj_weight=qw,
             k_proj_weight=kw,
             v_proj_weight=vw,
@@ -75,7 +77,7 @@ def bench_fused_rope_rms(
         )
 
     stats = _bench_fn(run, warmup, iters)
-    stats["kernel"] = "qwen36.fused_rope_rms"
+    stats["kernel"] = f"qwen36.fused_rope_rms:{impl}"
     stats["shape"] = f"B={batch},S={seq_len},H={hidden}"
     return stats
 
@@ -132,13 +134,17 @@ def main() -> int:
         "benchmarks": [],
     }
 
-    results["benchmarks"].append(
-        bench_fused_rope_rms(
-            args.batch, args.seq_len, args.hidden,
-            args.num_heads, args.num_kv_heads,
-            dtype, device, args.warmup, args.iters,
-        )
-    )
+    for impl in ("eager", "compiled", "fused"):
+        try:
+            results["benchmarks"].append(
+                bench_fused_rope_rms(
+                    args.batch, args.seq_len, args.hidden,
+                    args.num_heads, args.num_kv_heads,
+                    dtype, device, impl, args.warmup, args.iters,
+                )
+            )
+        except Exception as exc:
+            results["benchmarks"].append({"kernel": f"fused_rope_rms:{impl}", "error": str(exc)})
 
     head_dim = args.hidden // args.num_heads
     for impl in ("eager", "sdpa", "fused"):

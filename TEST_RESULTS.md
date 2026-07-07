@@ -148,3 +148,18 @@ curl http://127.0.0.1:8000/v1/completions \
 | Phase 1 tuned（chunked prefill + prefix cache + gpu-mem 0.92） | 7.35 | 17.42s |
 
 单请求场景下 Phase 1 参数无明显提升；并发 batch 测试待补。Qwen3.6 默认输出含 thinking 块，影响 tok/s 对比。
+
+### Phase 1 并发 batch（待实机）
+
+在 vLLM 已启动或自动启动模式下运行：
+
+```bash
+cd /data/metaX-inference
+bash scripts/run_phase1_concurrent_bench.sh
+# 或手动：
+python scripts/bench_qwen36.py --concurrency 8 --stream --json
+```
+
+**Phase 1 目标**（AGENT.md §12.5）：并发 8 req 总吞吐 **> 40 tok/s**。
+
+结果写入 `/data/metax-test-logs/phase1/PHASE1_CONCURRENT_BENCH.md`。

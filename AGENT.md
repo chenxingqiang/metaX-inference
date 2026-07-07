@@ -280,7 +280,9 @@ pip install "git+https://github.com/huggingface/transformers.git"
 | `scripts/remote_test_vllm_fix.sh` | 升级 transformers 后启动 vLLM 并验证 |
 | `scripts/bench_qwen36.py` | Qwen3.6 端到端 tok/s 基准（Phase 1+） |
 | `scripts/run_phase1_bench.sh` | Phase 1 vLLM 参数扫描 |
+| `scripts/run_phase1_concurrent_bench.sh` | Phase 1 并发 batch 基准（1/4/8 req） |
 | `scripts/run_op_bench.sh` | 算子级 micro-benchmark |
+| `scripts/remote_sync_repo.sh` | tarball 同步仓库到实机 |
 | `metax_kernels/bench/op_bench.py` | fused RoPE / GQA attention 基准 |
 | `configs/qwen36-27b-awq.yaml` | C500 32GB 推荐 vLLM 配置 |
 
