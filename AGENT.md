@@ -281,8 +281,11 @@ pip install "git+https://github.com/huggingface/transformers.git"
 | `scripts/bench_qwen36.py` | Qwen3.6 端到端 tok/s 基准（Phase 1+） |
 | `scripts/run_phase1_bench.sh` | Phase 1 vLLM 参数扫描 |
 | `scripts/run_phase1_concurrent_bench.sh` | Phase 1 并发 batch 基准（1/4/8 req） |
+| `scripts/run_phase3_mtp_bench.sh` | Phase 3 MTP / ngram speculative 基准 |
 | `scripts/run_op_bench.sh` | 算子级 micro-benchmark |
+| `scripts/profile_decode.py` | PyTorch profiler decode 热点分析 |
 | `scripts/remote_sync_repo.sh` | tarball 同步仓库到实机 |
+| `scripts/remote_run_all_benches.sh` | 一键跑 Phase 1/2/3 全套基准 |
 | `metax_kernels/bench/op_bench.py` | fused RoPE / GQA attention 基准 |
 | `configs/qwen36-27b-awq.yaml` | C500 32GB 推荐 vLLM 配置 |
 

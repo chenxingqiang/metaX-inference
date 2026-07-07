@@ -12,6 +12,7 @@ import torch
 
 from metax_kernels.qwen36.fused_rope_rms import fused_rope_rmsnorm
 from metax_kernels.qwen36.gqa_attention import gqa_attention
+from metax_kernels.qwen36.awq_gemm import awq_gemm
 from metax_kernels.registry import KernelRegistry
 
 
@@ -106,6 +107,29 @@ def bench_gqa_attention(
     return stats
 
 
+def bench_awq_gemm(
+    batch: int,
+    seq_len: int,
+    hidden: int,
+    out_features: int,
+    dtype: torch.dtype,
+    device: torch.device,
+    impl: str,
+    warmup: int,
+    iters: int,
+) -> Dict[str, float]:
+    x = torch.randn(batch, seq_len, hidden, device=device, dtype=dtype)
+    w = torch.randn(out_features, hidden, device=device, dtype=dtype)
+
+    def run():
+        awq_gemm(x, w, impl=impl)
+
+    stats = _bench_fn(run, warmup, iters)
+    stats["kernel"] = f"qwen36.awq_gemm:{impl}"
+    stats["shape"] = f"B={batch},S={seq_len},H={hidden},O={out_features}"
+    return stats
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="MACA Qwen3.6 operator micro-benchmark")
     parser.add_argument("--batch", type=int, default=1)
@@ -157,6 +181,17 @@ def main() -> int:
             )
         except Exception as exc:
             results["benchmarks"].append({"kernel": f"gqa:{impl}", "error": str(exc)})
+
+    for impl in ("eager", "fused"):
+        try:
+            results["benchmarks"].append(
+                bench_awq_gemm(
+                    args.batch, args.seq_len, args.hidden, args.hidden,
+                    dtype, device, impl, args.warmup, args.iters,
+                )
+            )
+        except Exception as exc:
+            results["benchmarks"].append({"kernel": f"awq_gemm:{impl}", "error": str(exc)})
 
     if args.json:
         print(json.dumps(results, indent=2))

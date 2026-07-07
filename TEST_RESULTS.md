@@ -163,3 +163,17 @@ python scripts/bench_qwen36.py --concurrency 8 --stream --json
 **Phase 1 目标**（AGENT.md §12.5）：并发 8 req 总吞吐 **> 40 tok/s**。
 
 结果写入 `/data/metax-test-logs/phase1/PHASE1_CONCURRENT_BENCH.md`。
+
+### Phase 3 MTP speculative（待实机）
+
+```bash
+bash /data/metaX-inference/scripts/run_phase3_mtp_bench.sh
+# 或一键全套：
+bash /data/metaX-inference/scripts/remote_run_all_benches.sh
+```
+
+**注意**：`QuantTrio/Qwen3.6-27B-AWQ` 可能缺少可用 BF16 MTP head（draft acceptance 0%）。若 MTP 无提升，需换带 `mtp.*` 权重的 checkpoint，或依赖 ngram fallback。
+
+**Phase 3 目标**：等效 tok/s **> 20**（AGENT.md §12.5）。
+
+结果写入 `/data/metax-test-logs/phase3/PHASE3_MTP_BENCH.md`。

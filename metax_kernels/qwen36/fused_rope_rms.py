@@ -7,7 +7,7 @@ Replace `fused` registration with mcoplib custom op when available.
 from __future__ import annotations
 
 import math
-from typing import Callable, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -19,6 +19,24 @@ DEFAULT_HIDDEN = 5120
 DEFAULT_HEADS = 40
 DEFAULT_KV_HEADS = 8
 DEFAULT_HEAD_DIM = 128
+
+_ROPE_CACHE: Dict[tuple, Tuple[torch.Tensor, torch.Tensor]] = {}
+
+
+def _get_rope_cache(
+    seq_len: int,
+    head_dim: int,
+    device: torch.device,
+    dtype: torch.dtype,
+    base: float = 1_000_000.0,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    key = (seq_len, head_dim, device.type, device.index, dtype, base)
+    cached = _ROPE_CACHE.get(key)
+    if cached is not None:
+        return cached
+    cos, sin = _build_rope_cache(seq_len, head_dim, device, dtype, base)
+    _ROPE_CACHE[key] = (cos, sin)
+    return cos, sin
 
 
 def _rms_norm(x: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
@@ -86,7 +104,7 @@ def fused_rope_rmsnorm_eager(
     q = _rms_norm(q, q_norm_weight, eps)
     k = _rms_norm(k, k_norm_weight, eps)
 
-    cos, sin = _build_rope_cache(seq_len, head_dim, hidden_states.device, hidden_states.dtype)
+    cos, sin = _get_rope_cache(seq_len, head_dim, hidden_states.device, hidden_states.dtype)
     q, k = _apply_rope(q, k, cos, sin)
 
     q = q.transpose(1, 2)

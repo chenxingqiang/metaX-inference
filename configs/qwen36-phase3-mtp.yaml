@@ -1,0 +1,55 @@
+# Qwen3.6-27B Phase 3 — MTP speculative decoding (AGENT.md §12.3)
+# Note: AWQ checkpoints may lack a usable BF16 MTP head (0% draft acceptance).
+# Prefer a checkpoint with preserved mtp.* weights, or use ngram fallback.
+
+model:
+  id: QuantTrio/Qwen3.6-27B-AWQ
+  local_dir: /data/models/Qwen3.6-27B-AWQ
+  max_model_len: 8192
+  trust_remote_code: true
+
+hardware:
+  gpu: MetaX C500
+  vram_gb: 32
+  tensor_parallel_size: 1
+
+vllm_serve:
+  host: 0.0.0.0
+  port: 8000
+  dtype: auto
+  gpu_memory_utilization: 0.90
+  max_num_batched_tokens: 8192
+  max_num_seqs: 32
+  enable_chunked_prefill: true
+  # MTP: prefix cache can hurt draft alignment on some builds — disable for MTP sweep
+  enable_prefix_caching: false
+  reasoning_parser: qwen3
+
+speculative:
+  # Primary: native Qwen3.6 MTP head (requires mtp.* in checkpoint)
+  mtp:
+    method: mtp
+    num_speculative_tokens: 2
+  mtp_conservative:
+    method: mtp
+    num_speculative_tokens: 1
+  # Fallback when AWQ lacks MTP head — no extra model weights
+  ngram:
+    method: ngram
+    num_speculative_tokens: 5
+    prompt_lookup_max: 4
+  suffix:
+    method: suffix
+    num_speculative_tokens: 5
+
+sampling:
+  temperature: 0.7
+  repetition_penalty: 1.1  # reduces MTP loop risk (see Qwen3.6 MTP guides)
+
+benchmark:
+  prompt: "你好，请用一句话介绍你自己。"
+  max_tokens: 128
+  concurrency: 1
+
+targets:
+  phase3_equivalent_tok_s: 20
