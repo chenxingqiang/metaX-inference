@@ -20,12 +20,12 @@ mkdir -p "$(dirname "$LOG")" "$LOCAL_DIR"
   echo ""
 } | tee "$LOG"
 
-if command -v huggingface-cli &>/dev/null; then
-  HF_CLI=huggingface-cli
-elif command -v hf &>/dev/null; then
+if command -v hf &>/dev/null; then
   HF_CLI=hf
+elif command -v huggingface-cli &>/dev/null; then
+  HF_CLI=huggingface-cli
 else
-  echo "ERROR: huggingface-cli / hf not found" | tee -a "$LOG"
+  echo "ERROR: hf / huggingface-cli not found" | tee -a "$LOG"
   exit 1
 fi
 
