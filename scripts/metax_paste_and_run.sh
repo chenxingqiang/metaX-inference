@@ -13,11 +13,14 @@ LOG_ROOT="${LOG_ROOT:-/data/metax-test-logs}"
 BRANCH="${BRANCH:-main}"
 GITHUB_RAW="${GITHUB_RAW:-https://raw.githubusercontent.com/chenxingqiang/metaX-inference}"
 
-source /opt/conda/etc/profile.d/conda.sh 2>/dev/null || true
-conda activate base 2>/dev/null || true
-export MACA_PATH="${MACA_PATH:-/opt/maca}"
-export LD_LIBRARY_PATH="/opt/maca/lib:/opt/maca/ompi/lib:/opt/maca/ucx/lib:/opt/mxdriver/lib:${LD_LIBRARY_PATH:-}"
-export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
+if [[ -f "${REPO_DIR}/scripts/metax_env.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${REPO_DIR}/scripts/metax_env.sh"
+else
+  curl -fsSL "$GITHUB_RAW/main/scripts/metax_env.sh" -o /tmp/metax_env.sh
+  # shellcheck source=/dev/null
+  source /tmp/metax_env.sh
+fi
 
 echo "=== metaX-inference 实机全套基准 ==="
 echo "时间: $(date -Iseconds)"
@@ -56,12 +59,12 @@ fi
 bash scripts/validate_repo.sh
 bash scripts/remote_run_all_benches.sh
 
-python scripts/bench_acceptance.py "$LOG_ROOT" --json -o "$LOG_ROOT/ACCEPTANCE.json"
-python scripts/bench_acceptance.py "$LOG_ROOT" | tee -a "$LOG_ROOT/ACCEPTANCE.txt"
-python scripts/bench_acceptance.py "$LOG_ROOT" --markdown -o "$LOG_ROOT/ACCEPTANCE.md"
+"$PYTHON" scripts/bench_acceptance.py "$LOG_ROOT" --json -o "$LOG_ROOT/ACCEPTANCE.json"
+"$PYTHON" scripts/bench_acceptance.py "$LOG_ROOT" | tee -a "$LOG_ROOT/ACCEPTANCE.txt"
+"$PYTHON" scripts/bench_acceptance.py "$LOG_ROOT" --markdown -o "$LOG_ROOT/ACCEPTANCE.md"
 
 if [[ -f "$LOG_ROOT/ACCEPTANCE.json" ]]; then
-  python scripts/update_acceptance_baseline.py "$LOG_ROOT/ACCEPTANCE.json" || true
+  "$PYTHON" scripts/update_acceptance_baseline.py "$LOG_ROOT/ACCEPTANCE.json" || true
 fi
 
 echo ""

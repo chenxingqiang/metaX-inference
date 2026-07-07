@@ -2,7 +2,7 @@
 
 在沐曦显卡上使用 Unsloth / vLLM 运行 Qwen3.6 推理的测试、内核与基准仓库。
 
-**Release:** [v0.1.0](https://github.com/chenxingqiang/metaX-inference/releases/tag/v0.1.0) — MetaX C500 实机 A/B 验证 + metax_kernels
+**Release:** [v0.1.1](https://github.com/chenxingqiang/metaX-inference/releases/tag/v0.1.1) · [v0.1.0](https://github.com/chenxingqiang/metaX-inference/releases/tag/v0.1.0)
 
 ## 文档
 

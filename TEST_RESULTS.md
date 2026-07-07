@@ -135,9 +135,10 @@ curl http://127.0.0.1:8000/v1/completions \
 - [ ] `export_bench_bundle.sh` + scp 下载 tarball
 - [ ] GitHub Issue 提交 benchmark 结果（可选）
 
+**Cloud Agent 代码交付：已完成**（v0.1.1）。剩余项需人工 SSH。
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/chenxingqiang/metaX-inference/main/scripts/metax_paste_and_run.sh | bash
-# 快速模式: FAST=1 curl ... | bash
+bash scripts/print_one_liners.sh   # 打印全部 one-liner
 ```
 
 ## 结论
