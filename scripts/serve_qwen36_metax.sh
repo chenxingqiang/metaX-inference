@@ -35,7 +35,7 @@ elif [[ "$PREFIX_CACHE" == "1" ]]; then
   EXTRA+=(--enable-prefix-caching)
 fi
 if [[ "$DISABLE_CUDAGRAPH" == "1" ]]; then
-  EXTRA+=(--max-cudagraph-capture-size 0)
+  EXTRA+=(--compilation-config '{"cudagraph_mode":"none"}')
 fi
 
 if [[ "$METAX_KERNELS" == "1" ]]; then

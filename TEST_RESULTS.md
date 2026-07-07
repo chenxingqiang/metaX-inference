@@ -211,7 +211,7 @@ bash scripts/run_phase3_mtp_bench.sh
 DISABLE_CUDAGRAPH=1 ENABLE_MTP=1 MTP_TOKENS=2 scripts/serve_qwen36_metax.sh
 ```
 
-添加 `--max-cudagraph-capture-size 0` 禁用 cudagraph capture。重测待确认。
+添加 `--compilation-config '{"cudagraph_mode":"none"}'` 禁用 cudagraph capture（仅 speculative 路径；baseline 不受影响）。重测待确认。
 
 结果文件：`/data/metax-test-logs/phase3/PHASE3_MTP_BENCH.md`
 
