@@ -29,10 +29,15 @@ else
   exit 1
 fi
 
-"$HF_CLI" download "$MODEL_ID" \
-  --local-dir "$LOCAL_DIR" \
-  --local-dir-use-symlinks False \
-  2>&1 | tee -a "$LOG"
+if [[ "$HF_CLI" == "hf" ]]; then
+  "$HF_CLI" download "$MODEL_ID" --local-dir "$LOCAL_DIR" \
+    2>&1 | tee -a "$LOG"
+else
+  "$HF_CLI" download "$MODEL_ID" \
+    --local-dir "$LOCAL_DIR" \
+    --local-dir-use-symlinks False \
+    2>&1 | tee -a "$LOG"
+fi
 
 echo "" | tee -a "$LOG"
 echo "=== MTP head check ===" | tee -a "$LOG"
