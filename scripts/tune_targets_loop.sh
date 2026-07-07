@@ -12,8 +12,6 @@ MAX_LOOPS="${MAX_LOOPS:-8}"
 
 mkdir -p "$LOG_ROOT"
 cd "$REPO_DIR"
-
-echo "=== tune_targets_loop ==="
 echo "  repo=$REPO_DIR"
 echo "  log=$LOG_ROOT"
 echo "  max_loops=$MAX_LOOPS"

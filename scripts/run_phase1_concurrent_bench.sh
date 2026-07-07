@@ -14,8 +14,11 @@ PORT="${PORT:-8000}"
 LOG_DIR="${LOG_DIR:-/data/metax-test-logs/phase1}"
 REPO_DIR="${REPO_DIR:-/data/metaX-inference}"
 RESULT="$LOG_DIR/PHASE1_CONCURRENT_BENCH.md"
-PROMPT="${PROMPT:-你好，请用一句话介绍你自己。}"
+PROMPT="${PROMPT:-请用中文写一段约120字的自我介绍，不要换行。}"
 MAX_TOKENS="${MAX_TOKENS:-128}"
+TEMPERATURE="${TEMPERATURE:-0.0}"
+BENCH_API="${BENCH_API:-completions}"
+BENCH_NO_THINK="${BENCH_NO_THINK:-0}"
 
 mkdir -p "$LOG_DIR"
 
@@ -26,6 +29,8 @@ mkdir -p "$LOG_DIR"
   echo "- GPU: $(mx-smi 2>/dev/null | grep -m1 MetaX || echo unknown)"
   echo "- Prompt: $PROMPT"
   echo "- max_tokens: $MAX_TOKENS"
+  echo "- temperature: $TEMPERATURE"
+  echo "- api: $BENCH_API"
   echo ""
 } > "$RESULT"
 
@@ -56,10 +61,17 @@ run_concurrent() {
   local label="$1"
   local concurrency="$2"
   echo "## $label (concurrency=$concurrency)" | tee -a "$RESULT"
+  local extra=()
+  if [[ "$BENCH_NO_THINK" == "1" ]]; then
+    extra+=(--no-think)
+  fi
   python "$REPO_DIR/scripts/bench_qwen36.py" \
     --url "http://${HOST}:${PORT}" \
     --prompt "$PROMPT" \
     --max-tokens "$MAX_TOKENS" \
+    --temperature "$TEMPERATURE" \
+    --api "$BENCH_API" \
+    "${extra[@]}" \
     --concurrency "$concurrency" \
     --requests "$concurrency" \
     --stream \

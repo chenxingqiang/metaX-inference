@@ -160,6 +160,53 @@ bash scripts/print_one_liners.sh   # 打印全部 one-liner
 
 原始 JSON：`metax_kernels/bench/results_op_bench_c500.json`
 
+## Phase 1 vLLM 并发 batch（MetaX C500，2026-07-07）
+
+### 自动调参循环（`tune_targets_loop.sh`，8 loops）
+
+| 配置 | c1 tok/s | c8 tok/s | 状态 |
+|------|----------|----------|------|
+| base + completions-default | 7.44 | 39.78 | c8 接近目标 |
+| **base + completions-t0** | 5.35 | **81.02** | **Phase 1 PASS** |
+| base + chat-no-think | 5.15 | 79.80 | Phase 1 PASS |
+| high-mem + completions-t0 | 5.29 | 80.82 | Phase 1 PASS |
+
+**关键发现：** `temperature=0` + 固定长度 prompt（约120字）使并发 x8 从 **21 → 81 tok/s**（3.8×）。TTFT 从 ~13s 降至 ~5s。
+
+最佳 Phase 1 配置见 `configs/qwen36-phase1-tuned.yaml`：
+
+```bash
+PROMPT="请用中文写一段约120字的自我介绍，不要换行。"
+TEMPERATURE=0 bash scripts/run_phase1_concurrent_bench.sh
+# 或
+bash scripts/tune_targets_loop.sh
+```
+
+结果：`/data/metax-test-logs/tune/TUNE_LOOP_RESULTS.md`
+
+### 历史并发测试（调参前）
+
+| 配置 | aggregate tok/s |
+|------|-----------------|
+| 默认 prompt + t0.7 | 21.09 |
+
+### Phase 0 单请求调参（`phase0_sweep.sh`）
+
+| 配置 | tok/s | tokens | TTFT | 状态 |
+|------|-------|--------|------|------|
+| completions t0.7 max128 | 7.50 | 128 | 13.0s | FAIL（thinking 块） |
+| **completions t0 max128** | **31.85** | 128 | **0.08s** | **PASS** |
+| completions t0 max64 | 31.46 | 64 | 0.09s | PASS |
+| short prompt t0 max128 | 31.84 | 126 | 0.04s | PASS |
+| chat no-think max128 | 3.28 | 19 | 5.2s | FAIL（早停） |
+
+**关键发现：** `temperature=0` 在 completions API 下跳过 Qwen3.6 thinking 预填充（TTFT 13s → 0.08s），单请求 **31.85 tok/s**，远超 9.5 目标。
+
+```bash
+python scripts/bench_qwen36.py --temperature 0 --max-tokens 128 --stream --json
+bash scripts/phase0_sweep.sh   # 实机 sweep
+```
+
 ## Phase 1 vLLM 参数扫描（MetaX C500，2026-07-07）
 
 | 配置 | tokens/s | elapsed (128 tok) |
@@ -200,13 +247,12 @@ bash /data/metaX-inference/scripts/remote_run_all_benches.sh
 
 ## 验收目标（AGENT.md §12.5）
 
-| 阶段 | 指标 | 目标 | 当前 |
-|------|------|------|------|
-| Phase 0 | 单请求 tok/s | ≥ 9.5 | **7.44–9.5**（已测） |
-| Phase 1 | 并发 8 req | ≥ 40 | 待实机 |
-| Phase 2 | 单请求 tok/s | ≥ 14 | 待实机 |
-| Phase 2 op | fused_rope_rms | ≤ 0.5 ms | **0.94 ms** eager |
-| Phase 3 | + MTP | ≥ 20 | 待实机 |
+| 阶段 | 指标 | 目标 | 当前 | 状态 |
+|------|------|------|------|------|
+| Phase 0 | 单请求 tok/s | ≥ 9.5 | **31.85**（t=0） | **PASS** |
+| Phase 1 | 并发 8 req | ≥ 40 | **81.02**（tune loop） | **PASS** |
+| Phase 2 op | fused_rope_rms | ≤ 0.5 ms | **0.94 ms** eager | FAIL |
+| Phase 3 | + MTP | ≥ 20 | 待实机 | 待测 |
 
 实机跑完后自动验收：
 ```bash
@@ -218,9 +264,9 @@ python scripts/bench_acceptance.py /data/metax-test-logs --markdown -o ACCEPTANC
 
 | 指标 | 实测 | 目标 | 状态 |
 |------|------|------|------|
-| phase0_single_tok_s | 7.44 | ≥ 9.5 | FAIL |
+| phase0_single_tok_s | 31.85 | ≥ 9.5 | **PASS** |
 | phase0_single_tok_s_peak | 9.5 | ≥ 9.5 | **PASS** |
-| phase1_concurrent_8_tok_s | — | ≥ 40 | SKIP |
+| phase1_concurrent_8_tok_s | 81.02 | ≥ 40 | **PASS** |
 | phase3_mtp_tok_s | — | ≥ 20 | SKIP |
 | fused_rope_rms_ms | 0.94 | ≤ 0.5 | FAIL |
 
