@@ -18,14 +18,23 @@ from metax_kernels.qwen36.fused_rope_rms import fused_rope_rmsnorm
 from metax_kernels.qwen36.gqa_attention import gqa_attention
 
 
+def _device_time_us(evt: Any) -> float:
+    """Return GPU time in microseconds (PyTorch 2.8 uses device_time_total)."""
+    for attr in ("cuda_time_total", "device_time_total", "self_cuda_time_total"):
+        val = getattr(evt, attr, None)
+        if val is not None:
+            return float(val)
+    return float(getattr(evt, "cpu_time_total", 0.0))
+
+
 def _top_ops(prof: torch.profiler.profile, limit: int = 15) -> List[Dict[str, Any]]:
     events = prof.key_averages()
     rows: List[Dict[str, Any]] = []
-    for evt in sorted(events, key=lambda e: e.cuda_time_total, reverse=True)[:limit]:
+    for evt in sorted(events, key=_device_time_us, reverse=True)[:limit]:
         rows.append(
             {
                 "name": evt.key,
-                "cuda_time_us": round(evt.cuda_time_total, 1),
+                "cuda_time_us": round(_device_time_us(evt), 1),
                 "cpu_time_us": round(evt.cpu_time_total, 1),
                 "count": evt.count,
             }

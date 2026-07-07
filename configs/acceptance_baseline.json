@@ -1,12 +1,12 @@
 {
   "hardware": {"gpu": "MetaX C500", "vram_gb": 32},
   "metrics": {
-    "phase0_single_tok_s": 7.44,
+    "phase0_single_tok_s": 7.29,
     "phase0_single_tok_s_peak": 9.5,
-    "phase1_concurrent_8_tok_s": null,
+    "phase1_concurrent_8_tok_s": 21.09,
     "phase2_single_tok_s": null,
     "phase3_mtp_tok_s": null
   },
   "op_bench_path": "metax_kernels/bench/results_op_bench_c500.json",
-  "source": "TEST_RESULTS.md 2026-07-07"
+  "source": "TEST_RESULTS.md 2026-07-07 SSH full benchmark"
 }

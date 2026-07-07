@@ -18,6 +18,9 @@ RESULT="$LOG_DIR/PHASE3_MTP_BENCH.md"
 PROMPT="${PROMPT:-你好，请用一句话介绍你自己。}"
 MAX_TOKENS="${MAX_TOKENS:-128}"
 MTP_TOKENS="${MTP_TOKENS:-2}"
+# Speculative decode + CUDA graph capture breaks Triton autotune on MACA
+# (maca_fused_recurrent_gated_delta_rule: "operation not permitted when stream is capturing").
+DISABLE_CUDAGRAPH="${DISABLE_CUDAGRAPH:-1}"
 
 mkdir -p "$LOG_DIR"
 
@@ -30,8 +33,15 @@ mkdir -p "$LOG_DIR"
   echo ""
   echo "> AWQ 量化模型可能缺少可用 MTP head（draft acceptance 0%）。"
   echo "> 若 MTP 无提升，请换带 \`mtp.*\` BF16 权重的 checkpoint。"
+  echo "> DISABLE_CUDAGRAPH=$DISABLE_CUDAGRAPH (workaround for MACA Triton autotune + cudagraph capture)."
   echo ""
 } > "$RESULT"
+
+cudagraph_args() {
+  if [[ "$DISABLE_CUDAGRAPH" == "1" ]]; then
+    echo --max-cudagraph-capture-size 0
+  fi
+}
 
 start_vllm() {
   local label="$1"
@@ -39,7 +49,7 @@ start_vllm() {
   echo "Starting vLLM: $label" | tee -a "$RESULT"
   pkill -f "vllm serve" 2>/dev/null || true
   sleep 3
-  # shellcheck disable=SC2068
+  # shellcheck disable=SC2046,SC2068
   nohup vllm serve "$MODEL" \
     --host "$HOST" --port "$PORT" \
     --tensor-parallel-size 1 \
@@ -50,6 +60,7 @@ start_vllm() {
     --max-num-seqs 32 \
     --enable-chunked-prefill \
     --trust-remote-code \
+    $(cudagraph_args) \
     "$@" \
     > "$LOG_DIR/vllm-phase3-${RANDOM}.log" 2>&1 &
   for i in $(seq 1 180); do
