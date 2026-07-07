@@ -4,10 +4,17 @@
   "date": "2026-07-07",
   "seq_len": 256,
   "benchmarks": [
-    {"kernel": "qwen36.fused_rope_rms", "avg_ms": 0.94, "shape": "B=1,S=256,H=5120"},
-    {"kernel": "qwen36.gqa_attention:eager", "avg_ms": 0.25, "shape": "B=1,H=40,S=256,D=128"},
-    {"kernel": "qwen36.gqa_attention:sdpa", "avg_ms": 0.12, "shape": "B=1,H=40,S=256,D=128"},
-    {"kernel": "qwen36.gqa_attention:fused", "avg_ms": 0.16, "shape": "B=1,H=40,S=256,D=128"}
+    {"kernel": "qwen36.fused_rope_rms:eager", "avg_ms": 0.522, "shape": "B=1,S=256,H=5120"},
+    {"kernel": "qwen36.fused_rope_rms:opt_eager", "avg_ms": 0.659, "shape": "B=1,S=256,H=5120"},
+    {"kernel": "qwen36.fused_rope_rms:compiled", "avg_ms": 0.543, "shape": "B=1,S=256,H=5120"},
+    {"kernel": "qwen36.fused_rope_rms:fused", "avg_ms": 0.525, "shape": "B=1,S=256,H=5120"},
+    {"kernel": "qwen36.gqa_attention:eager", "avg_ms": 0.228, "shape": "B=1,H=40,S=256,D=128"},
+    {"kernel": "qwen36.gqa_attention:sdpa", "avg_ms": 0.110, "shape": "B=1,H=40,S=256,D=128"},
+    {"kernel": "qwen36.gqa_attention:fused", "avg_ms": 0.152, "shape": "B=1,H=40,S=256,D=128"},
+    {"kernel": "qwen36.awq_gemm:eager", "avg_ms": 0.159, "shape": "B=1,S=256,H=5120"},
+    {"kernel": "qwen36.awq_gemm:fused", "avg_ms": 0.161, "shape": "B=1,S=256,H=5120"},
+    {"kernel": "qwen36.fused_mlp:eager", "avg_ms": 1.104, "shape": "B=1,S=256,H=5120"},
+    {"kernel": "qwen36.fused_mlp:fused", "avg_ms": 1.103, "shape": "B=1,S=256,H=5120"}
   ],
-  "notes": "SDPA fastest for GQA at S=256; fused_rope_rms is eager baseline pending mcoplib kernel"
+  "notes": "Full op_bench on MetaX C500 2026-07-07 SSH run; fused_rope_rms best eager 0.522ms (target 0.5ms pending mcoplib kernel)"
 }

@@ -18,6 +18,10 @@ RESULT="$LOG_DIR/PHASE3_MTP_BENCH.md"
 PROMPT="${PROMPT:-你好，请用一句话介绍你自己。}"
 MAX_TOKENS="${MAX_TOKENS:-128}"
 MTP_TOKENS="${MTP_TOKENS:-2}"
+# Speculative decode + CUDA graph capture breaks Triton autotune on MACA
+# (maca_fused_recurrent_gated_delta_rule: "operation not permitted when stream is capturing").
+DISABLE_CUDAGRAPH="${DISABLE_CUDAGRAPH:-1}"
+COMP_CONFIG_NONE='{"cudagraph_mode":"none"}'
 
 mkdir -p "$LOG_DIR"
 
@@ -30,15 +34,21 @@ mkdir -p "$LOG_DIR"
   echo ""
   echo "> AWQ 量化模型可能缺少可用 MTP head（draft acceptance 0%）。"
   echo "> 若 MTP 无提升，请换带 \`mtp.*\` BF16 权重的 checkpoint。"
+  echo "> DISABLE_CUDAGRAPH=$DISABLE_CUDAGRAPH (uses --compilation-config cudagraph_mode=none for speculative)."
   echo ""
 } > "$RESULT"
 
 start_vllm() {
   local label="$1"
-  shift
+  local use_no_cg="${2:-0}"
+  shift 2
   echo "Starting vLLM: $label" | tee -a "$RESULT"
   pkill -f "vllm serve" 2>/dev/null || true
   sleep 3
+  local cg_args=()
+  if [[ "$use_no_cg" == "1" && "$DISABLE_CUDAGRAPH" == "1" ]]; then
+    cg_args=(--compilation-config "$COMP_CONFIG_NONE")
+  fi
   # shellcheck disable=SC2068
   nohup vllm serve "$MODEL" \
     --host "$HOST" --port "$PORT" \
@@ -50,6 +60,7 @@ start_vllm() {
     --max-num-seqs 32 \
     --enable-chunked-prefill \
     --trust-remote-code \
+    "${cg_args[@]}" \
     "$@" \
     > "$LOG_DIR/vllm-phase3-${RANDOM}.log" 2>&1 &
   for i in $(seq 1 180); do
@@ -75,18 +86,18 @@ run_bench() {
 }
 
 # Baseline (no speculative)
-start_vllm "baseline"
+start_vllm "baseline" 0
 run_bench "Baseline (no speculative)"
 
 # MTP native head
 SPEC_MTP="{\"method\":\"mtp\",\"num_speculative_tokens\":${MTP_TOKENS}}"
-if start_vllm "mtp" --speculative-config "$SPEC_MTP" --reasoning-parser qwen3; then
+if start_vllm "mtp" 1 --speculative-config "$SPEC_MTP" --reasoning-parser qwen3; then
   run_bench "MTP (num_speculative_tokens=${MTP_TOKENS})"
 fi
 
 # ngram fallback (works without MTP weights)
 SPEC_NGRAM='{"method":"ngram","num_speculative_tokens":5,"prompt_lookup_max":4}'
-if start_vllm "ngram" --speculative-config "$SPEC_NGRAM"; then
+if start_vllm "ngram" 1 --speculative-config "$SPEC_NGRAM"; then
   run_bench "N-gram speculative (fallback)"
 fi
 

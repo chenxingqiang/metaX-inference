@@ -24,6 +24,8 @@ METAX_KERNEL_IMPL="${METAX_KERNEL_IMPL:-fused}"
 ENABLE_MTP="${ENABLE_MTP:-0}"
 MTP_TOKENS="${MTP_TOKENS:-2}"
 PREFIX_CACHE="${PREFIX_CACHE:-1}"
+# Disable CUDA graphs when speculative decode is on (MACA Triton autotune vs cudagraph capture).
+DISABLE_CUDAGRAPH="${DISABLE_CUDAGRAPH:-$([[ "$ENABLE_MTP" == "1" ]] && echo 1 || echo 0)}"
 
 EXTRA=()
 if [[ "$ENABLE_MTP" == "1" ]]; then
@@ -31,6 +33,9 @@ if [[ "$ENABLE_MTP" == "1" ]]; then
   EXTRA+=(--reasoning-parser qwen3)
 elif [[ "$PREFIX_CACHE" == "1" ]]; then
   EXTRA+=(--enable-prefix-caching)
+fi
+if [[ "$DISABLE_CUDAGRAPH" == "1" ]]; then
+  EXTRA+=(--compilation-config '{"cudagraph_mode":"none"}')
 fi
 
 if [[ "$METAX_KERNELS" == "1" ]]; then
