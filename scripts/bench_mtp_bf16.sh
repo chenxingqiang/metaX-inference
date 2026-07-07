@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/metax_env.sh"
 
 REPO_DIR="${REPO_DIR:-/data/metaX-inference}"
-MODEL="${MODEL:-/data/models/Qwen3.6-27B-MTP-BF16}"
+MODEL="${MODEL:-/data/models/Qwen3.6-27B-AWQ-MTP-BF16}"
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8000}"
 LOG_DIR="${LOG_DIR:-/data/metax-test-logs/mtp-bf16}"
@@ -22,6 +22,7 @@ cd "$REPO_DIR"
 
 if [[ ! -f "$MODEL/config.json" ]]; then
   echo "ERROR: model not found at $MODEL — run scripts/download_qwen36_mtp_bf16.sh first" >&2
+  echo "  (grafts BF16 mtp.* from hampsonw onto MetaX-compatible AWQ base)" >&2
   exit 1
 fi
 

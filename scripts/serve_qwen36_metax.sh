@@ -13,6 +13,7 @@ export LD_LIBRARY_PATH="/opt/maca/lib:/opt/maca/ompi/lib:/opt/maca/ucx/lib:/opt/
 export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 
 MODEL="${MODEL:-/data/models/Qwen3.6-27B-AWQ}"
+MTP_GRAFTED="${MTP_GRAFTED:-/data/models/Qwen3.6-27B-AWQ-MTP-BF16}"
 HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-8000}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-8192}"
@@ -29,6 +30,10 @@ DISABLE_CUDAGRAPH="${DISABLE_CUDAGRAPH:-$([[ "$ENABLE_MTP" == "1" ]] && echo 1 |
 
 EXTRA=()
 if [[ "$ENABLE_MTP" == "1" ]]; then
+  if [[ -f "$MTP_GRAFTED/config.json" && "$MODEL" == "/data/models/Qwen3.6-27B-AWQ" ]]; then
+    MODEL="$MTP_GRAFTED"
+    echo "ENABLE_MTP=1 — using grafted BF16 MTP checkpoint: $MODEL"
+  fi
   EXTRA+=(--speculative-config "{\"method\":\"mtp\",\"num_speculative_tokens\":${MTP_TOKENS}}")
   EXTRA+=(--reasoning-parser qwen3)
 elif [[ "$PREFIX_CACHE" == "1" ]]; then

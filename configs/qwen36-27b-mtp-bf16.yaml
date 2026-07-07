@@ -1,11 +1,12 @@
-# Qwen3.6-27B with BF16 MTP head graft (fits MetaX C500 32GB)
-# Source: hampsonw/Qwen3.6-27B-AWQ-BF16-INT4-mtp-bf16
-# Main weights: AWQ INT4 (~26GB); mtp.* tensors: BF16 (15 tensors, ~810MB)
+# Qwen3.6-27B AWQ + BF16 MTP head graft (MetaX C500 32GB)
+# hampsonw/Qwen3.6-27B-AWQ-BF16-INT4-mtp-bf16 cannot load directly on MetaX
+# (compressed-tensors WNA16). Use graft: AWQ base + BF16 mtp.* from source.
 
 model:
   id: hampsonw/Qwen3.6-27B-AWQ-BF16-INT4-mtp-bf16
-  local_dir: /data/models/Qwen3.6-27B-MTP-BF16
-  fallback_awq: /data/models/Qwen3.6-27B-AWQ
+  mtp_source: /data/models/Qwen3.6-27B-MTP-BF16
+  awq_base: /data/models/Qwen3.6-27B-AWQ
+  local_dir: /data/models/Qwen3.6-27B-AWQ-MTP-BF16
 
 vllm:
   tensor_parallel_size: 1
