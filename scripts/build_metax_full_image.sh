@@ -12,8 +12,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TRUSTCLAW_DIR="${TRUSTCLAW_DIR:-$REPO_ROOT/../TrustClaw}"
+TRUSTCLAW_DIR="${TRUSTCLAW_DIR:-$REPO_ROOT/TrustClaw}"
 SAVE_BUNDLE=0
+USE_PREBUILT="${USE_PREBUILT:-1}"
 DOCKER_USER="${DOCKER_USER:-chenxingqiang}"
 
 for arg in "$@"; do
@@ -31,6 +32,16 @@ if ! command -v docker &>/dev/null; then
   exit 1
 fi
 
+DOCKER="${DOCKER:-docker}"
+if ! $DOCKER info >/dev/null 2>&1; then
+  if sudo docker info >/dev/null 2>&1; then
+    DOCKER="sudo docker"
+  else
+    echo "ERROR: docker daemon not reachable"
+    exit 1
+  fi
+fi
+
 if [[ ! -f "$TRUSTCLAW_DIR/Dockerfile" ]]; then
   echo "ERROR: TrustClaw not found at $TRUSTCLAW_DIR"
   echo "Clone: git clone https://github.com/chenxingqiang/TrustClaw.git $TRUSTCLAW_DIR"
@@ -38,25 +49,32 @@ if [[ ! -f "$TRUSTCLAW_DIR/Dockerfile" ]]; then
 fi
 
 echo "=== [1/3] Build metax-openclaw:local from TrustClaw ==="
-if [[ -f "$TRUSTCLAW_DIR/pnpm-workspace.yaml" ]]; then
-  sed -i 's/^minimumReleaseAge: 2880/minimumReleaseAge: 0/' "$TRUSTCLAW_DIR/pnpm-workspace.yaml" 2>/dev/null || \
-    sed -i '' 's/^minimumReleaseAge: 2880/minimumReleaseAge: 0/' "$TRUSTCLAW_DIR/pnpm-workspace.yaml" 2>/dev/null || true
+if [[ "$USE_PREBUILT" == "1" && -f "$TRUSTCLAW_DIR/dist/index.js" ]]; then
+  echo "Using prebuilt TrustClaw dist at $TRUSTCLAW_DIR/dist"
+  $DOCKER build \
+    -t metax-openclaw:local \
+    -f "$REPO_ROOT/docker/metax-full/Dockerfile.openclaw-prebuilt" \
+    "$TRUSTCLAW_DIR"
+else
+  if [[ -f "$TRUSTCLAW_DIR/pnpm-workspace.yaml" ]]; then
+    sed -i 's/^minimumReleaseAge: 2880/minimumReleaseAge: 0/' "$TRUSTCLAW_DIR/pnpm-workspace.yaml" 2>/dev/null || \
+      sed -i '' 's/^minimumReleaseAge: 2880/minimumReleaseAge: 0/' "$TRUSTCLAW_DIR/pnpm-workspace.yaml" 2>/dev/null || true
+  fi
+  $DOCKER build \
+    -t metax-openclaw:local \
+    --build-arg OPENCLAW_TRUSTCLAW_UI=1 \
+    -f "$TRUSTCLAW_DIR/Dockerfile" \
+    "$TRUSTCLAW_DIR"
 fi
 
-docker build \
-  -t metax-openclaw:local \
-  --build-arg OPENCLAW_TRUSTCLAW_UI=1 \
-  -f "$TRUSTCLAW_DIR/Dockerfile" \
-  "$TRUSTCLAW_DIR"
-
 echo "=== [2/3] Build metax-vllm:local ==="
-docker build \
+$DOCKER build \
   -t metax-vllm:local \
   -f "$REPO_ROOT/docker/metax-full/Dockerfile.vllm" \
   "$REPO_ROOT"
 
 echo "=== [3/3] Build metax-trustclaw:local ==="
-docker build \
+$DOCKER build \
   -t metax-trustclaw:local \
   --build-arg OPENCLAW_IMAGE=metax-openclaw:local \
   -f "$REPO_ROOT/docker/metax-full/Dockerfile.trustclaw" \
@@ -64,7 +82,7 @@ docker build \
 
 echo ""
 echo "=== Build complete ==="
-docker images | grep -E 'metax-(openclaw|vllm|trustclaw)' || true
+$DOCKER images | grep -E 'metax-(openclaw|vllm|trustclaw)' || true
 echo ""
 echo "Run:"
 echo "  cd $REPO_ROOT/docker/metax-full"
@@ -79,7 +97,7 @@ if [[ "$SAVE_BUNDLE" -eq 1 ]]; then
   OUT="$REPO_ROOT/docker/metax-full/dist/metax-full-images.tar"
   mkdir -p "$(dirname "$OUT")"
   echo "Saving bundle to $OUT ..."
-  docker save -o "$OUT" \
+  $DOCKER save -o "$OUT" \
     metax-openclaw:local \
     metax-vllm:local \
     metax-trustclaw:local
