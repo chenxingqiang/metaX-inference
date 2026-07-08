@@ -12,6 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+PREBUILT_TARBALL="${PREBUILT_TARBALL:-/data/TrustClaw-prebuilt.tar.gz}"
 TRUSTCLAW_DIR="${TRUSTCLAW_DIR:-/data/TrustClaw}"
 TRUSTCLAW_REPO="${TRUSTCLAW_REPO:-https://github.com/chenxingqiang/TrustClaw.git}"
 NODE_VERSION="${NODE_VERSION:-22.19.0}"
@@ -54,18 +55,50 @@ install_node() {
 
 install_node
 
-if [[ ! -d "$TRUSTCLAW_DIR/.git" ]]; then
-  echo "Cloning TrustClaw to $TRUSTCLAW_DIR ..."
-  git clone --depth 1 "$TRUSTCLAW_REPO" "$TRUSTCLAW_DIR"
+if [[ ! -f "$TRUSTCLAW_DIR/package.json" ]]; then
+  TARBALL="${TRUSTCLAW_TARBALL:-/data/TrustClaw-src.tar.gz}"
+  if [[ -f "$TARBALL" ]]; then
+    echo "Extracting TrustClaw from $TARBALL ..."
+    mkdir -p "$TRUSTCLAW_DIR"
+    tar -xzf "$TARBALL" -C "$TRUSTCLAW_DIR" --strip-components=1 2>/dev/null || \
+      tar -xzf "$TARBALL" -C "$(dirname "$TRUSTCLAW_DIR")"
+  else
+    echo "Cloning TrustClaw to $TRUSTCLAW_DIR ..."
+    for url in \
+      "https://ghproxy.net/$TRUSTCLAW_REPO" \
+      "https://mirror.ghproxy.com/$TRUSTCLAW_REPO" \
+      "$TRUSTCLAW_REPO"; do
+      if git clone --depth 1 "$url" "$TRUSTCLAW_DIR" 2>/dev/null; then
+        break
+      fi
+      rm -rf "$TRUSTCLAW_DIR"
+    done
+  fi
+fi
+
+if [[ ! -f "$TRUSTCLAW_DIR/package.json" ]]; then
+  echo "ERROR: TrustClaw source missing at $TRUSTCLAW_DIR (clone failed; upload TrustClaw-src.tar.gz to /data/)"
+  exit 1
 fi
 
 cd "$TRUSTCLAW_DIR"
 
+# TrustClaw lockfile may include very new packages; relax supply-chain age gate for deploy.
+export npm_config_minimumReleaseAge=0
+if [[ -f pnpm-workspace.yaml ]]; then
+  sed -i 's/^minimumReleaseAge: 2880/minimumReleaseAge: 0/' pnpm-workspace.yaml
+fi
+
 if [[ ! -f dist/index.js ]]; then
-  echo "Building TrustClaw (first run, ~15–30 min) ..."
-  pnpm install --config.minimumReleaseAge=0
-  pnpm build
-  pnpm trustclaw:ui:build
+  if [[ -f "$PREBUILT_TARBALL" ]]; then
+    echo "Extracting prebuilt TrustClaw from $PREBUILT_TARBALL ..."
+    tar -xzf "$PREBUILT_TARBALL" -C "$(dirname "$TRUSTCLAW_DIR")"
+  else
+    echo "Building TrustClaw (gatewayWatch profile) ..."
+    pnpm install --config.minimumReleaseAge=0
+    node scripts/build-all.mjs gatewayWatch
+    pnpm trustclaw:ui:build --config.minimumReleaseAge=0
+  fi
 fi
 
 GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-}"
