@@ -1,0 +1,21 @@
+# TrustClaw overlay on OpenClaw image — vLLM backend for MetaX full stack.
+ARG OPENCLAW_IMAGE=metax-openclaw:local
+FROM ${OPENCLAW_IMAGE}
+
+USER root
+COPY docker/metax-full/init-config.mjs /opt/metax-full/init-config.mjs
+COPY docker/metax-full/entrypoint-trustclaw.sh /usr/local/bin/metax-trustclaw-entrypoint.sh
+RUN chmod 755 /opt/metax-full/init-config.mjs /usr/local/bin/metax-trustclaw-entrypoint.sh
+
+USER node
+ENV OPENCLAW_DISABLE_BONJOUR=1 \
+    OPENCLAW_GATEWAY_PORT=19001 \
+    VLLM_BASE_URL=http://vllm:8000/v1 \
+    VLLM_MODEL_ID=/data/models/Qwen3.6-27B-AWQ
+
+EXPOSE 19001
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
+  CMD node -e "fetch('http://127.0.0.1:19001/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+ENTRYPOINT ["tini", "-s", "--", "/usr/local/bin/metax-trustclaw-entrypoint.sh"]
