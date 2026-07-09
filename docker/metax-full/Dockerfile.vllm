@@ -1,0 +1,22 @@
+# MetaX vLLM runtime wrapper — mounts host MACA + conda at run time.
+FROM ubuntu:22.04
+
+RUN apt-get update -qq \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    ca-certificates curl tini \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY docker/metax-full/entrypoint-vllm.sh /usr/local/bin/metax-vllm-entrypoint.sh
+RUN chmod 755 /usr/local/bin/metax-vllm-entrypoint.sh
+
+ENV MODEL=/data/models/Qwen3.6-27B-AWQ \
+    HOST=0.0.0.0 \
+    PORT=8000 \
+    MACA_PATH=/opt/maca
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=10 \
+  CMD-SHELL 'curl -sf http://127.0.0.1:8000/v1/models -H "Authorization: Bearer ${VLLM_API_KEY}" || exit 1'
+
+ENTRYPOINT ["tini", "-s", "--", "/usr/local/bin/metax-vllm-entrypoint.sh"]
