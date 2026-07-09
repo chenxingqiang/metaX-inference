@@ -6,7 +6,7 @@
 |------|-----|
 | 日期 | 2026-07-06 |
 | 服务器 | 140.207.205.81:32222 |
-| GPU | MetaX C500（sGPU 配额 **32GB** VRAM，算力 50%） |
+| GPU | MetaX C500（sGPU 配额 **32GB** VRAM，算力 **50%** — 云平台预分配，容器内不可改） |
 | MACA | 3.5.3.20 |
 | 系统 | Ubuntu 20.04 / Linux 5.15 |
 | Python | 3.10.10 (conda base) |
@@ -289,6 +289,65 @@ bash scripts/mtp80_control_c8.sh          # no-MTP vs MTP 对照
 **结论：** AWQ 模型上 MTP speculative 增加 draft 开销但 acceptance 极低（`modules_to_not_convert` 含 `mtp`），**MTP 模式无法达到 80 tok/s**。要达到 80 tok/s 并发，使用 **无 MTP** 的 Phase 1 配置（`temperature=0` + long prompt + c=8）。BF16 MTP checkpoint 方可重新评估。
 
 日志：`/data/metax-test-logs/tune/mtp80/MTP80_LOOP_RESULTS.md`
+
+### BF16 MTP checkpoint 切换（2026-07-07）
+
+**Checkpoint：** `hampsonw/Qwen3.6-27B-AWQ-BF16-INT4-mtp-bf16`（AWQ INT4 主权重 + 15 个 BF16 `mtp.*` 张量）
+
+**MetaX 兼容性：** hampsonw 整包 **无法直接加载** — compressed-tensors WNA16 `uint4` 与 MetaX Exllama 内核（仅支持 `uint4b8`/`uint8b128`）不兼容：
+
+```
+ValueError: MacaExllamaLinearKernel ... Quant type (uint4) not supported
+```
+
+**Graft 方案（推荐）：** 下载 hampsonw 仅作 MTP 源，将 15 个 BF16 `mtp.*` 张量 graft 到 MetaX 兼容 AWQ 基座：
+
+```bash
+bash scripts/download_qwen36_mtp_bf16.sh          # 下载 + graft
+# 或已有源时：SKIP_DOWNLOAD=1 FORCE_GRAFT=1 bash scripts/download_qwen36_mtp_bf16.sh
+MODEL=/data/models/Qwen3.6-27B-AWQ-MTP-BF16 bash scripts/bench_mtp_bf16.sh
+ENABLE_MTP=1 ./scripts/serve_qwen36_metax.sh     # 自动选用 graft 模型
+```
+
+**验证：** graft 前后 `mtp.*` 张量与现有 `Qwen3.6-27B-AWQ` **数值完全一致**（hampsonw 与 QuantTrio AWQ 同源 graft）。
+
+| 模式 | c | tok/s | 目标 80 | 状态 |
+|------|---|-------|---------|------|
+| Graft baseline（无 MTP） | 1 | **31.98** | — | — |
+| Graft baseline（无 MTP） | 8 | **80.57** | 80 | **PASS** |
+| Graft + MTP-2 | 1 | 23.05 | ≥ 20 | PASS |
+| Graft + MTP-2 | 8 short | 47.29 | 80 | FAIL |
+| Graft + MTP-2 | 8 long | 39.83 | 80 | FAIL |
+
+**结论：** 换 BF16 MTP checkpoint（graft）后 MTP c=8 仍 **~40–47 tok/s**，未达 80 tok/s。瓶颈不在 MTP 权重 dtype，而在 MetaX/vLLM speculative decode 路径本身。生产推荐继续 **无 MTP** c=8（~81 tok/s）。
+
+日志：`/data/metax-test-logs/mtp-bf16/MTP_BF16_BENCH.md`
+
+### sGPU 50% 算力限制（2026-07-07）
+
+**现状（容器内 `mx-smi`）：**
+
+```
+sGPU-Id 2 | Compute 50% | Vram 32000 MiB | Minor 016
+/sys 只读 (Docker guest) → mx-smi sgpu --disable / --set 失败
+```
+
+**容器内无法解除** — 需在 **云平台/宿主机** 调整实例 GPU 配额：
+
+| 方式 | 操作 |
+|------|------|
+| **云平台控制台** | 将实例 GPU 配额改为 **vcore=100%、vmemory=64G**（或整卡分配） |
+| **宿主机** | `bash scripts/metax_sgpu_full_gpu.sh`（`MODE=disable` 或 `MODE=set`） |
+| **K8s/HAMi** | Pod limits: `metax-tech.com/vcore: 100`, `metax-tech.com/vmemory: 64` |
+
+诊断（只读）：
+
+```bash
+CHECK_ONLY=1 bash scripts/metax_sgpu_full_gpu.sh
+mx-smi sgpu --show-remain   # available compute quota: 0% → 已满配给本实例
+```
+
+**解除后预期（估算，需复测）：** 单流 ~**60+ tok/s**，c=8 聚合 ~**150+ tok/s**（相对当前 32 / 81 约 2×）。
 
 实机跑完后自动验收：
 ```bash
