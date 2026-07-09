@@ -323,6 +323,36 @@ ENABLE_MTP=1 ./scripts/serve_qwen36_metax.sh     # 自动选用 graft 模型
 
 日志：`/data/metax-test-logs/mtp-bf16/MTP_BF16_BENCH.md`
 
+### C8160 聚合 160 tok/s 调参循环（2026-07-07）
+
+```bash
+C8_TARGET=160 MAX_LOOPS=20 bash scripts/tune_c8_160_loop.sh
+REFINE=1 MAX_LOOPS=10 LOG_ROOT=/data/metax-test-logs/tune/c8160-refine bash scripts/tune_c8_160_loop.sh
+bash scripts/retest_c8160_best.sh   # c=18 最佳配置 3 次复测
+```
+
+**关键结论：c=8 无法到 160（50% sGPU 封顶 ~81）；需提高并发到 c=16–18。**
+
+| 并发 c | vLLM 配置 | 聚合 tok/s | 目标 160 |
+|--------|-----------|-----------|----------|
+| 8 | high-mem-batch16k | **81.17** | FAIL |
+| 16 | aggressive-seq256 | **151.33** | FAIL |
+| 16 | aggressive | **149.08** | FAIL |
+| **18** | **high-mem-batch16k** | **155.89** | 接近（-2.6%） |
+| 24 | aggressive-seq256 | 136.79 | FAIL（过载） |
+
+最佳生产配置见 `configs/qwen36-c8160-tuned.yaml`：
+
+```bash
+# vLLM: gpu_mem=0.95 max_batched=16384 max_seqs=128 prefix-cache
+python scripts/bench_qwen36.py --concurrency 18 --requests 18 \
+  --temperature 0 --warmup-requests 1 --prompt "请用中文写一段约120字的自我介绍，不要换行。"
+```
+
+**literal c=8 → 160** 需 **解除 sGPU 50% 限制**（算力翻倍后 c=8 有望 ~160）。
+
+日志：`/data/metax-test-logs/tune/c8160/C8160_LOOP_RESULTS.md`、`c8160-refine/`、`c8160-retest/`
+
 ### sGPU 50% 算力限制（2026-07-07）
 
 **现状（容器内 `mx-smi`）：**
