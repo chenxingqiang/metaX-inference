@@ -1,0 +1,5 @@
+{
+  "prompt": "你好，我是",
+  "max_tokens": 64,
+  "temperature": 0.7
+}

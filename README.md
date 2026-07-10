@@ -7,6 +7,99 @@
 
 ---
 
+## 项目简介
+
+**MetaX-TrustClaw** 参加 **第八届 CCF 开源创新大赛 · 国产开源 GPU AI 创新生态赛**。
+
+- **战队：** YiRage · **队长：** 陈星强 · **厦门大学**
+- **定位：** 基于沐曦国产 GPU 的本地可信 AI Agent 全栈，不调用 OpenAI 等外部云端 API
+- **双仓库：** [metaX-inference](https://gitlink.org.cn/xingjian/metaX-inference)（推理层）+ [TrustClaw](https://gitlink.org.cn/xingjian/trustclaw)（Agent 运行时，OpenClaw 生态）
+
+## 功能说明
+
+| 功能 | 说明 |
+|------|------|
+| 沐曦 Qwen3.6 推理 | vLLM + vllm_metax，OpenAI 兼容 API（:8000/v1） |
+| 自定义 MACA 算子 | fused RoPE/GQA/AWQ/MLP，`METAX_KERNELS=1` 启用 |
+| 全链路 benchmark | Phase 0→3 验收脚本，实机 tok/s / 并发 / MTP |
+| TrustClaw TRA 集成 | Agent Pack、Evidence 链、TRA Console |
+| 模型接口调用 | `configs/trustclaw-metax-vllm.json` 配置本地 vLLM provider |
+| Docker 一键部署 | vLLM + TrustClaw 全栈 compose |
+
+## 模型与算力环境
+
+| 项 | 配置 |
+|----|------|
+| **模型** | QuantTrio/Qwen3.6-27B-AWQ（INT4） |
+| **GPU** | 沐曦 MetaX C500，32GB sGPU，MACA 3.5.3 |
+| **推理引擎** | vLLM 0.17.0 + vllm_metax 0.17.0 |
+| **Agent 框架** | TrustClaw（OpenClaw fork + trustclaw-tra） |
+| **算力来源** | 沐曦算力卡 / Gitee.AI 沐曦资源包（赛题要求） |
+
+## 示例输入输出
+
+### vLLM Completions API
+
+**请求**（见 [docs/samples/vllm_completion_request.json](./docs/samples/vllm_completion_request.json)）：
+
+```bash
+curl http://127.0.0.1:8000/v1/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $VLLM_API_KEY" \
+  -d '{"prompt":"你好，我是","max_tokens":64,"temperature":0.7}'
+```
+
+**响应**（摘录，见 [docs/samples/vllm_completion_response.json](./docs/samples/vllm_completion_response.json)）：
+
+```json
+{
+  "choices": [{"text": "小雅。你好，小雅！很高兴认识你。", "finish_reason": "length"}],
+  "usage": {"completion_tokens": 64}
+}
+```
+
+### Agent Chat API（TrustClaw）
+
+```bash
+curl -X POST http://127.0.0.1:19001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"请根据我的数据回答","agentPack":"glp1-eligibility"}'
+```
+
+## 演示材料
+
+| 材料 | 位置 |
+|------|------|
+| **创意规划 PPT（阶段一）** | `docs/` 目录内 PPT 文件 |
+| **技术说明 PDF** | [docs/CCF_TECH_SUMMARY.pdf](./docs/CCF_TECH_SUMMARY.pdf) |
+| **性能测试报告 PDF** | [docs/CCF_TEST_REPORT.pdf](./docs/CCF_TEST_REPORT.pdf) |
+| **项目简介 PDF** | [docs/CCF_PROJECT_BRIEF.pdf](./docs/CCF_PROJECT_BRIEF.pdf) |
+| **真实调用日志** | [TEST_RESULTS.md](./TEST_RESULTS.md)、[docs/samples/inference_call_log.txt](./docs/samples/inference_call_log.txt) |
+| **运行截图** | [docs/demo/](./docs/demo/)（待上传截图） |
+| **Demo 演示视频** | **待填链接：** `<!-- 上传后填写，例如：https://... -->` |
+
+## 参考来源说明
+
+本项目参考并扩展以下开源项目，**非简单复制**：
+
+| 项目 | 协议 | 本仓库改造 |
+|------|------|-----------|
+| vLLM / vllm_metax | Apache-2.0 | 沐曦 kernel + benchmark 体系 |
+| OpenClaw / TrustClaw | MIT | TRA 扩展 + 沐曦 vLLM 后端集成 |
+| transformers | Apache-2.0 | Qwen3.6 qwen3_5 适配 |
+
+完整说明见 **[docs/REFERENCES.md](./docs/REFERENCES.md)**。
+
+## 开发过程记录
+
+- **Issue 模板：** [.github/ISSUE_TEMPLATE/development_record.yml](./.github/ISSUE_TEMPLATE/development_record.yml)
+- **开发记录摘要：** [docs/DEVELOPMENT_LOG.md](./docs/DEVELOPMENT_LOG.md)
+- **Commit 历史：** GitLink 仓库提交记录
+- **提交对照表：** [docs/SUBMISSION.md](./docs/SUBMISSION.md)
+
+
+---
+
 ## 服务框架
 
 MetaX-TrustClaw 分为 **应用层 / 推理层 / 算力层** 三层，数据与审计全程本地闭环：
@@ -132,8 +225,13 @@ python scripts/bench_acceptance.py . --markdown
 - **[AGENT.md](./AGENT.md)** — 测试方案 + §12 MACA 最佳推理架构设计
 - **[TEST_RESULTS.md](./TEST_RESULTS.md)** — 实机 A/B 测试与调参全记录
 - **[docker/metax-full/README.md](./docker/metax-full/README.md)** — Docker 全栈构建与离线部署
-- **[docs/CCF_PROJECT_BRIEF.md](./docs/CCF_PROJECT_BRIEF.md)** — 大赛项目简介（可导出 PDF）
-- **[docs/CCF_TECH_SUMMARY.md](./docs/CCF_TECH_SUMMARY.md)** — 大赛技术文档摘要（可导出 PDF）
+- **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** — 部署指南
+- **[docs/REFERENCES.md](./docs/REFERENCES.md)** — 参考来源与原创说明
+- **[docs/SUBMISSION.md](./docs/SUBMISSION.md)** — 作品提交对照表
+- **[docs/DEVELOPMENT_LOG.md](./docs/DEVELOPMENT_LOG.md)** — 功能开发记录
+- **[docs/CCF_PROJECT_BRIEF.pdf](./docs/CCF_PROJECT_BRIEF.pdf)** — 项目简介 PDF
+- **[docs/CCF_TECH_SUMMARY.pdf](./docs/CCF_TECH_SUMMARY.pdf)** — 技术说明 PDF
+- **[docs/CCF_TEST_REPORT.pdf](./docs/CCF_TEST_REPORT.pdf)** — 性能测试报告 PDF
 
 ---
 

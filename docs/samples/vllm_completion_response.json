@@ -1,0 +1,18 @@
+{
+  "id": "cmpl-metaX-example",
+  "object": "text_completion",
+  "created": 1720000000,
+  "model": "/data/models/Qwen3.6-27B-AWQ",
+  "choices": [
+    {
+      "index": 0,
+      "text": "小雅。你好，小雅！很高兴认识你。",
+      "finish_reason": "length"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 4,
+    "completion_tokens": 64,
+    "total_tokens": 68
+  }
+}

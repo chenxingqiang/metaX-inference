@@ -1,0 +1,23 @@
+# MetaX C500 实机推理环境依赖（参考版本，以沐曦 conda 环境为准）
+# Python >= 3.10
+
+# Core inference (installed via MetaX conda / pip on target machine)
+vllm==0.17.0
+# vllm_metax==0.17.0  # MetaX vendor plugin
+# torch==2.8.0+metax3.5.3.9
+
+# Model loading (Qwen3.6 qwen3_5 architecture)
+transformers>=5.14.0.dev0
+accelerate
+sentencepiece
+safetensors
+
+# Benchmark / tooling
+requests
+pyyaml
+
+# Local package
+# pip install -e .
+
+# TrustClaw (separate repo, Node.js stack)
+# Node.js >= 22.19, pnpm >= 11
